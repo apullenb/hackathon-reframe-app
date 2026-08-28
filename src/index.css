@@ -108,3 +108,17 @@
       var(--tw-shadow, 0 0 #0000);
   }
 }
+
+@layer utilities {
+  /**
+   * Presentation Mode (brief §10.7): enlarge critical content for a room reading from a
+   * projector. Done as one root-level scale rather than per-component overrides, so nothing
+   * can be left behind at demo size.
+   */
+  :root[data-presentation='on'] {
+    font-size: 18px;
+  }
+  :root[data-presentation='on'] .cs-hide-in-presentation {
+    display: none;
+  }
+}

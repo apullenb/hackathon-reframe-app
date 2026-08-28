@@ -1,261 +1,321 @@
-import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
-import type { ContextSwitchResponse, ContextSwitchMode } from '@/types/contracts';
-import type { ToolId } from '@/situation/types';
-import { createSituation, situationReducer, hasUnsavedUserContent } from '@/situation/reducer';
-import { featureById } from '@/features/registry';
-import { ConsoleShell } from '@/components/shell';
-import { HomeScreen, CommandPalette, ContextSwitchOverlay } from '@/components/home';
-import type { PaletteCommand, ScenarioSummary } from '@/components/home';
-import { StateInspector, ThoughtDebugger, StackTrace, BreakpointOverlay } from '@/components/inspect';
-import { UnitTestRunner } from '@/components/communicate';
-import { Patch } from '@/components/repair';
-import { HealthCheck, Postmortem } from '@/components/patterns';
+import { useCallback, useMemo, useState } from 'react';
+import { MessageSquareText, HeartHandshake, Compass, Settings2, RotateCcw } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import type {
+  CommunicationContext,
+  ContextSwitchError,
+  ContextSwitchMode,
+  ContextSwitchResponse,
+  ConflictLensResponse,
+  ConflictSpeaker,
+} from '@/types/contracts';
+import { CommunicateView } from '@/components/communicate2';
+import { RepairView } from '@/components/repair2';
+import { InspectFlow } from '@/components/inspect2';
 import { AiModeIndicator } from '@/components/AiModeIndicator';
 import { AiSettingsDrawer } from '@/components/AiSettingsDrawer';
-import { SayItBetterResult } from '@/components/sayItBetter';
-import { DecodeResult } from '@/components/decode';
-import { ConflictLensResult } from '@/components/conflict';
-import { TranslationLoadingState } from '@/components/TranslationLoadingState';
-import { ErrorFallback, ResultReadyBubbles } from '@/components/shared';
-import { Button } from '@/components/ui';
-import { FIXTURES, CONFLICT_ALEX_SAM_SPEAKERS } from '@/fixtures';
+import { Button, Select } from '@/components/ui';
+import { RoleSelector } from '@/components/context/RoleSelector';
+import { RELATIONSHIPS } from '@/data/vocabulary';
+import {
+  FIXTURES,
+  PREPARED_SCENARIOS,
+  CONFLICT_ALEX_SAM_SPEAKERS,
+  CONFLICT_ALEX_SAM_CONVERSATION,
+} from '@/fixtures';
 import { useAiRouter } from '@/hooks/useAiRouter';
-import type { ContextSwitchError } from '@/types/contracts';
-import { SCENARIOS, scenarioById } from '@/features/scenarios';
+import { cn } from '@/lib/cn';
 
 /**
- * The console application.
+ * Three things this app does, in the order people need them.
  *
- * One `CurrentSituation` drives every tool (brief §2.3). The three analysis tools that already
- * existed — Message Compiler, Signal Decoder, Conflict Trace — keep their verified result views
- * and are fed from that situation, rather than being rebuilt.
+ * Deliberately flat: one row of three tabs, no rail, no drawer, no tool registry. An earlier
+ * version organised twelve developer-named features into five workspaces and became impossible
+ * to understand on sight. Everything here is either the translator, conflict help, or a guided
+ * set of questions about how you feel.
  */
 
-/** Which analysis mode backs each of the three AI-driven tools. */
-const TOOL_TO_MODE: Partial<Record<ToolId, ContextSwitchMode>> = {
-  message_compiler: 'say_it_better',
-  signal_decoder: 'decode_it',
-  conflict_trace: 'conflict_lens',
+type TabId = 'communicate' | 'repair' | 'inspect';
+
+const TABS: ReadonlyArray<{
+  id: TabId;
+  label: string;
+  blurb: string;
+  icon: LucideIcon;
+}> = [
+  {
+    id: 'communicate',
+    label: 'Communicate',
+    blurb: 'Say it better, or understand what someone sent you.',
+    icon: MessageSquareText,
+  },
+  {
+    id: 'repair',
+    label: 'Repair',
+    blurb: 'Work out what an argument is actually about.',
+    icon: HeartHandshake,
+  },
+  {
+    id: 'inspect',
+    label: 'Inspect',
+    blurb: 'Questions to help you work out how you feel.',
+    icon: Compass,
+  },
+];
+
+/**
+ * Nothing is pre-selected. Guessing that the user is an engineer talking to a product manager is
+ * presumptuous everywhere and plainly wrong in Repair, where the whole point is that the people
+ * involved are the user's own.
+ */
+const DEFAULT_CONTEXT: Partial<CommunicationContext> = {
+  humorLevel: 'unfiltered',
 };
 
 export function App() {
-  const [situation, dispatch] = useReducer(situationReducer, undefined, () => createSituation());
+  const [tab, setTab] = useState<TabId>('communicate');
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const { router, config, probe, refreshConfig } = useAiRouter();
 
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const [contextSwitchOpen, setContextSwitchOpen] = useState(false);
-  const [breakpointOpen, setBreakpointOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [presentationMode, setPresentationMode] = useState(false);
-
+  const [mode, setMode] = useState<ContextSwitchMode>('say_it_better');
+  const [context, setContext] = useState<Partial<CommunicationContext>>(DEFAULT_CONTEXT);
+  const [text, setText] = useState('');
   const [result, setResult] = useState<ContextSwitchResponse | null>(null);
-  const [resultSource, setResultSource] = useState<'proxy' | 'direct' | 'fixture' | null>(null);
-  const [provider, setProvider] = useState<string | null>(null);
   const [error, setError] = useState<ContextSwitchError | null>(null);
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState(0);
   const [resultToken, setResultToken] = useState(0);
+  const [source, setSource] = useState<'proxy' | 'direct' | 'fixture' | null>(null);
+  const [provider, setProvider] = useState<string | null>(null);
 
-  const openTool = useCallback((tool: ToolId) => {
-    const feature = featureById(tool);
-    if (tool === 'context_switch') { setContextSwitchOpen(true); return; }
-    if (tool === 'breakpoint') { setBreakpointOpen(true); return; }
-    setResult(null);
+  const rolesChosen = Boolean(context.selfRole && context.otherRole);
+
+  const canRun = Boolean(
+    context.selfRole && context.otherRole && context.relationship && context.channel && text.trim(),
+  );
+
+  const deliver = useCallback((response: ContextSwitchResponse, src: 'proxy' | 'direct' | 'fixture', prov?: string | null) => {
+    setResult(response);
+    setSource(src);
+    setProvider(prov ?? null);
     setError(null);
-    dispatch({ type: 'open_tool', tool, workspace: feature.workspace });
+    setResultToken((token) => token + 1);
   }, []);
 
-  /* ── Global shortcuts: ⌘K palette, and the presentation scenario keys (brief §10.7) ── */
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      // `event.target` is not always an Element — a keydown with focus on the document targets
-      // `window`, which has no `matches`, and calling it would throw and kill every shortcut.
-      const target = event.target;
-      const typing =
-        target instanceof Element &&
-        target.matches('input, textarea, select, [contenteditable="true"]');
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        setPaletteOpen((open) => !open);
-        return;
-      }
-      if (typing || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (event.key === '1') loadScenario('husband');
-      else if (event.key === '2') loadScenario('engineer');
-      else if (event.key === '3') loadScenario('conflict');
-      else if (event.key.toLowerCase() === 'b') setBreakpointOpen(true);
-      else if (event.key.toLowerCase() === 'r') handleReset();
-      else if (event.key.toLowerCase() === 'p') setPresentationMode((on) => !on);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const loadScenario = useCallback((id: string) => {
-    const scenario = scenarioById(id);
-    if (!scenario) return;
-    setResult(null);
-    setError(null);
-    setResultSource(null);
-    dispatch({ type: 'load_scenario', situation: scenario.build() });
-  }, []);
-
-  const handleReset = useCallback(() => {
-    // Brief §9: reset is immediate, but confirm when it would destroy the user's own content.
-    if (hasUnsavedUserContent(situation)) {
-      const ok = window.confirm('Reset clears the current situation, including what you typed. Continue?');
-      if (!ok) return;
-    }
-    setResult(null);
-    setError(null);
-    setResultSource(null);
-    dispatch({ type: 'reset' });
-  }, [situation]);
-
-  /* ── Running one of the three analysis tools ─────────────────────────── */
-  const runAnalysis = useCallback(async () => {
-    const mode = TOOL_TO_MODE[situation.activeTool];
-    if (!mode) return;
+  const runTranslate = useCallback(async () => {
+    if (!canRun) return;
     setBusy(true);
     setStage(0);
     setError(null);
-
-    const context = {
-      selfRole: situation.roles.user,
-      otherRole: situation.roles.recipient,
-      relationship: situation.roles.relationship,
-      channel: situation.roles.channel,
-      desiredOutcome: situation.desiredOutcome,
-      humorLevel: situation.safety.seriousMode ? ('off' as const) : ('unfiltered' as const),
-    };
-
     const request =
-      mode === 'conflict_lens'
-        ? {
-            mode,
-            context,
-            speakers: CONFLICT_ALEX_SAM_SPEAKERS,
-            conversation:
-              situation.conversation?.map((t) => `${t.speaker}: ${t.text}`).join('\n') ?? '',
-            scenarioId: situation.scenarioId,
-          }
-        : {
-            mode,
-            context,
-            sourceText:
-              (mode === 'decode_it' ? situation.incomingMessage : situation.rawOutgoingMessage) ?? '',
-            scenarioId: situation.scenarioId,
-          };
-
+      mode === 'say_it_better'
+        ? ({ mode: 'say_it_better', context: context as CommunicationContext, sourceText: text.trim() } as const)
+        : ({ mode: 'decode_it', context: context as CommunicationContext, sourceText: text.trim() } as const);
     const outcome = await router.analyze(request);
     setBusy(false);
-    if (outcome.ok) {
-      setResult(outcome.response);
-      setResultSource(outcome.source);
-      setProvider(outcome.provider ?? null);
-      setResultToken((t) => t + 1);
-      dispatch({ type: 'mark_tool', tool: situation.activeTool, status: 'complete' });
-      if (outcome.response.mode === 'say_it_better' && outcome.response.sendableMessage) {
-        dispatch({ type: 'set_draft', draft: outcome.response.sendableMessage });
-      }
-    } else {
-      setError(outcome.error);
-    }
-  }, [router, situation]);
+    if (outcome.ok) deliver(outcome.response, outcome.source, outcome.provider);
+    else setError(outcome.error);
+  }, [canRun, router, mode, context, text, deliver]);
 
-  /** Offer the built-in example when a live call fails — never substitute it silently. */
-  const useSavedExample = useCallback(() => {
-    const mode = TOOL_TO_MODE[situation.activeTool];
-    if (!mode) return;
-    const key =
-      mode === 'say_it_better' ? 'sayItBetterEngineerPm'
-      : mode === 'decode_it' ? 'decodePmToEngineer' : 'conflictAlexSam';
-    const response = FIXTURES[key] as ContextSwitchResponse;
-    setResult(response);
-    setResultSource('fixture');
-    setProvider(null);
+  /** Offered when a live call fails — never substituted silently. */
+  const useExample = useCallback(() => {
+    const key = mode === 'say_it_better' ? 'sayItBetterEngineerPm' : 'decodePmToEngineer';
+    deliver(FIXTURES[key] as ContextSwitchResponse, 'fixture');
+  }, [mode, deliver]);
+
+  /** Loads the worked example's context and message so the user can see the whole shape. */
+  const loadExample = useCallback(() => {
+    const scenario = PREPARED_SCENARIOS.find((s) =>
+      mode === 'say_it_better' ? s.id === 'engineer_pm_status' : s.id === 'decode_pm_checkin',
+    );
+    if (!scenario) return;
+    setContext(scenario.context);
+    setText(scenario.sourceText ?? '');
+    setResult(null);
     setError(null);
-    setResultToken((t) => t + 1);
-    if (response.mode === 'say_it_better' && response.sendableMessage) {
-      dispatch({ type: 'set_draft', draft: response.sendableMessage });
-    }
-  }, [situation.activeTool]);
+  }, [mode]);
 
-  const scenarioSummaries = useMemo<ScenarioSummary[]>(
-    () => SCENARIOS.map((s) => ({ id: s.id, title: s.title, proves: s.proves })),
+  const analyzeConflict = useCallback(
+    async (conversation: string, speakers: ConflictSpeaker[]) => {
+      const outcome = await router.analyze({
+        mode: 'conflict_lens' as const,
+        context: context as CommunicationContext,
+        speakers,
+        conversation,
+      });
+      if (outcome.ok && outcome.response.mode === 'conflict_lens') {
+        setSource(outcome.source);
+        setProvider(outcome.provider ?? null);
+        return { ok: true as const, response: outcome.response };
+      }
+      return {
+        ok: false as const,
+        message: outcome.ok ? 'That did not come back in a form we could read.' : outcome.error.userMessage,
+      };
+    },
+    [router, context],
+  );
+
+  const conflictExample = useMemo(
+    () => ({
+      conversation: CONFLICT_ALEX_SAM_CONVERSATION,
+      speakers: CONFLICT_ALEX_SAM_SPEAKERS,
+      response: FIXTURES.conflictAlexSam as ConflictLensResponse,
+    }),
     [],
   );
 
-  const paletteExtras = useMemo<PaletteCommand[]>(
-    () => [
-      ...SCENARIOS.map((s) => ({
-        id: `scenario-${s.id}`,
-        label: `Load example: ${s.title}`,
-        keywords: ['scenario', 'example', s.id],
-        run: () => loadScenario(s.id),
-      })),
-      { id: 'presentation', label: 'Toggle Presentation Mode', keywords: ['present', 'demo', 'stage'], run: () => setPresentationMode((on) => !on) },
-      { id: 'reset', label: 'Reset current situation', keywords: ['clear', 'start over'], run: handleReset },
-      { id: 'settings', label: 'Open AI settings', keywords: ['provider', 'key', 'model'], run: () => setSettingsOpen(true) },
-    ],
-    [loadScenario, handleReset],
-  );
+  const resetAll = useCallback(() => {
+    setText('');
+    setResult(null);
+    setError(null);
+    setSource(null);
+    setContext(DEFAULT_CONTEXT);
+  }, []);
 
-  const aiStatus = (
-    <AiModeIndicator
-      activeSource={resultSource}
-      activeProvider={provider}
-      configuredMode={config.mode}
-      errored={Boolean(error)}
-    />
-  );
+  const active = TABS.find((t) => t.id === tab) ?? TABS[0];
 
   return (
-    <ConsoleShell
-      situation={situation}
-      dispatch={dispatch}
-      aiStatus={aiStatus}
-      onOpenContextSwitch={() => setContextSwitchOpen(true)}
-      onOpenCommandPalette={() => setPaletteOpen(true)}
-      onReset={handleReset}
-      presentationMode={presentationMode}
-    >
-      <ToolSurface
-        situation={situation}
-        dispatch={dispatch}
-        openTool={openTool}
-        scenarios={scenarioSummaries}
-        loadScenario={loadScenario}
-        busy={busy}
-        stage={stage}
-        onAdvanceStage={() => setStage((s) => s + 1)}
-        result={result}
-        error={error}
-        resultToken={resultToken}
-        runAnalysis={runAnalysis}
-        useSavedExample={useSavedExample}
-      />
+    <div className="grain relative min-h-screen overflow-x-clip bg-paper">
+      <a
+        href="#main"
+        className="sr-only-focusable absolute left-4 top-4 z-50 rounded-card bg-primary px-4 py-2.5 text-sm font-bold text-white shadow-lift"
+      >
+        Skip to content
+      </a>
 
-      <ContextSwitchOverlay
-        open={contextSwitchOpen}
-        onClose={() => setContextSwitchOpen(false)}
-        situation={situation}
-        onChange={(patch) => dispatch({ type: 'set_roles', patch })}
-        humorAllowed={situation.safety.humorAllowed && situation.humorLevel !== 'off'}
-      />
-      <BreakpointOverlay
-        open={breakpointOpen}
-        onClose={() => setBreakpointOpen(false)}
-        situation={situation}
-        dispatch={dispatch}
-      />
-      <CommandPalette
-        open={paletteOpen}
-        onClose={() => setPaletteOpen(false)}
-        onOpenTool={openTool}
-        extraCommands={paletteExtras}
-      />
+      <header className="border-b border-line bg-paper/90 backdrop-blur">
+        <div className="mx-auto w-full max-w-5xl px-4 py-4 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-display text-xl font-semibold tracking-tight text-ink">
+                Context Switch
+              </p>
+              <p className="text-sm font-medium text-ink-muted">
+                Help saying the hard thing, and understanding what someone meant.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <AiModeIndicator
+                activeSource={source}
+                activeProvider={provider}
+                configuredMode={config.mode}
+                errored={Boolean(error)}
+              />
+              <Button variant="outline" size="sm" leadingIcon={Settings2} onClick={() => setSettingsOpen(true)}>
+                Settings
+              </Button>
+              <Button variant="ghost" size="sm" leadingIcon={RotateCcw} onClick={resetAll}>
+                Start over
+              </Button>
+            </div>
+          </div>
+
+          <nav aria-label="Sections" className="mt-4">
+            <ul className="grid gap-2 sm:grid-cols-3">
+              {TABS.map((entry) => {
+                const isActive = entry.id === tab;
+                return (
+                  <li key={entry.id}>
+                    <button
+                      type="button"
+                      aria-current={isActive ? 'page' : undefined}
+                      onClick={() => setTab(entry.id)}
+                      className={cn(
+                        'flex min-h-tap w-full flex-col items-start gap-0.5 rounded-card border px-4 py-3 text-left transition-colors',
+                        isActive
+                          ? 'border-primary bg-primary-soft'
+                          : 'border-line bg-surface hover:border-primary/45',
+                      )}
+                    >
+                      <span className="flex items-center gap-2">
+                        <entry.icon
+                          className={cn('h-4 w-4', isActive ? 'text-primary' : 'text-ink-muted')}
+                          aria-hidden="true"
+                        />
+                        <span className={cn('font-bold', isActive ? 'text-primary' : 'text-ink')}>
+                          {entry.label}
+                        </span>
+                      </span>
+                      <span className="text-sm font-medium leading-snug text-ink-muted">
+                        {entry.blurb}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+        </div>
+      </header>
+
+      <main id="main" className="relative z-10 mx-auto w-full max-w-5xl px-4 py-7 sm:px-6">
+        <h1 className="sr-only">{active.label}</h1>
+
+        {tab === 'communicate' ? (
+          <CommunicateView
+            mode={mode}
+            onModeChange={(next) => {
+              setMode(next);
+              setResult(null);
+              setError(null);
+            }}
+            context={context}
+            onContextChange={(patch) => setContext((prev) => ({ ...prev, ...patch }))}
+            text={text}
+            onTextChange={setText}
+            onRun={runTranslate}
+            canRun={canRun}
+            busy={busy}
+            stage={stage}
+            onAdvanceStage={() => setStage((s) => s + 1)}
+            result={result}
+            error={error}
+            resultToken={resultToken}
+            onUseExample={useExample}
+            onLoadExample={loadExample}
+          />
+        ) : null}
+
+        {tab === 'repair' ? (
+          <div className="space-y-6">
+            <ConflictPeoplePicker context={context} onChange={(patch) => setContext((prev) => ({ ...prev, ...patch }))} />
+            {rolesChosen ? (
+              <RepairView
+                otherPerson={context.otherRole ?? 'the other person'}
+                analyze={analyzeConflict}
+                onLoadExample={() => undefined}
+                example={conflictExample}
+              />
+            ) : (
+              <p className="rounded-card border border-line bg-surface p-4 text-sm font-medium leading-relaxed text-ink-muted">
+                Pick who the disagreement was between, and we will take it from there.
+              </p>
+            )}
+          </div>
+        ) : null}
+
+        {tab === 'inspect' ? (
+          <InspectFlow
+            otherPerson={context.otherRole ?? 'the other person'}
+            onTakeToTranslator={(draft) => {
+              setMode('say_it_better');
+              setText(draft);
+              setResult(null);
+              setError(null);
+              setTab('communicate');
+            }}
+          />
+        ) : null}
+      </main>
+
+      <footer className="mx-auto w-full max-w-5xl px-4 pb-10 sm:px-6">
+        <p className="border-t border-line pt-4 text-sm font-medium leading-relaxed text-ink-muted">
+          This helps you communicate. It does not read minds, and it is not therapy, legal, or
+          crisis support.
+        </p>
+      </footer>
+
       <AiSettingsDrawer
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
@@ -263,131 +323,57 @@ export function App() {
         configuredMode={config.mode}
         onKeyChange={refreshConfig}
       />
-    </ConsoleShell>
+    </div>
   );
 }
 
-type ToolSurfaceProps = {
-  situation: ReturnType<typeof createSituation>;
-  dispatch: React.Dispatch<Parameters<typeof situationReducer>[1]>;
-  openTool: (tool: ToolId) => void;
-  scenarios: ScenarioSummary[];
-  loadScenario: (id: string) => void;
-  busy: boolean;
-  stage: number;
-  onAdvanceStage: () => void;
-  result: ContextSwitchResponse | null;
-  error: ContextSwitchError | null;
-  resultToken: number;
-  runAnalysis: () => void;
-  useSavedExample: () => void;
-};
-
-function ToolSurface(props: ToolSurfaceProps) {
-  const { situation, dispatch, openTool, busy, result, error } = props;
-
-  if (situation.activeWorkspace === 'home') {
-    return (
-      <HomeScreen
-        situation={situation}
-        onOpenTool={openTool}
-        onSetUserRole={(role) => dispatch({ type: 'set_roles', patch: { user: role } })}
-        scenarios={props.scenarios}
-        onLoadScenario={props.loadScenario}
-      />
-    );
-  }
-
-  switch (situation.activeTool) {
-    case 'state_inspector':
-      return <StateInspector situation={situation} dispatch={dispatch} />;
-    case 'thought_debugger':
-      return <ThoughtDebugger situation={situation} dispatch={dispatch} />;
-    case 'stack_trace':
-      return <StackTrace situation={situation} dispatch={dispatch} onOpenTool={openTool} />;
-    case 'unit_tests':
-      return <UnitTestRunner situation={situation} dispatch={dispatch} onOpenTool={openTool} />;
-    case 'patch':
-      return <Patch situation={situation} dispatch={dispatch} onOpenTool={openTool} />;
-    case 'health_check':
-      return <HealthCheck situation={situation} dispatch={dispatch} onOpenTool={openTool} />;
-    case 'postmortem':
-      return <Postmortem situation={situation} dispatch={dispatch} onOpenTool={openTool} />;
-    default:
-      break;
-  }
-
-  const mode = TOOL_TO_MODE[situation.activeTool];
-  if (!mode) {
-    return (
-      <p className="text-sm font-medium text-ink-muted">
-        {featureById(situation.activeTool).summary}
-      </p>
-    );
-  }
-
-  if (busy) {
-    return (
-      <TranslationLoadingState
-        mode={mode}
-        context={{ selfRole: situation.roles.user, otherRole: situation.roles.recipient }}
-        stage={props.stage}
-        onAdvanceStage={props.onAdvanceStage}
-      />
-    );
-  }
-
-  if (error) {
-    return (
-      <ErrorFallback
-        error={error}
-        onRetry={props.runAnalysis}
-        onUseFixture={props.useSavedExample}
-      />
-    );
-  }
-
-  if (result) {
-    return (
-      <div className="relative">
-        <ResultReadyBubbles trigger={props.resultToken} />
-        {result.mode === 'say_it_better' ? (
-          <SayItBetterResult
-            response={result}
-            humorLevel={situation.humorLevel === 'off' ? 'off' : 'unfiltered'}
-            onRegenerate={props.runAnalysis}
-            onEditContext={() => openTool('context_switch')}
-          />
-        ) : result.mode === 'decode_it' ? (
-          <DecodeResult
-            response={result}
-            senderRole={situation.roles.recipient}
-            recipientRole={situation.roles.user}
-            onRegenerate={props.runAnalysis}
-            onEditContext={() => openTool('context_switch')}
-          />
-        ) : (
-          <ConflictLensResult
-            response={result}
-            speakers={CONFLICT_ALEX_SAM_SPEAKERS}
-            onRegenerate={props.runAnalysis}
-            onEditContext={() => openTool('context_switch')}
-          />
-        )}
-      </div>
-    );
-  }
-
-  const feature = featureById(situation.activeTool);
+/**
+ * Who the disagreement was between. Deliberately the first thing on the Repair screen and
+ * deliberately empty on arrival — the analysis reads very differently for a partner than for a
+ * manager, and assuming either would put words in the user's mouth.
+ */
+function ConflictPeoplePicker({
+  context,
+  onChange,
+}: {
+  context: Partial<CommunicationContext>;
+  onChange: (patch: Partial<CommunicationContext>) => void;
+}) {
   return (
-    <div className="space-y-4">
+    <section aria-labelledby="people-heading" className="space-y-4">
       <div>
-        <h1 className="font-display text-display-sm font-semibold text-ink">{feature.name}</h1>
-        <p className="mt-2 max-w-2xl text-sm font-medium leading-relaxed text-ink-muted">
-          {feature.summary}
+        <h2 id="people-heading" className="font-display text-xl font-semibold text-ink">
+          Who was this between?
+        </h2>
+        <p className="mt-1 text-sm font-medium text-ink-muted">
+          It changes what the disagreement is likely to be about.
         </p>
       </div>
-      <Button onClick={props.runAnalysis}>Run {feature.name}</Button>
-    </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <RoleSelector
+          label="I am"
+          hint="Your side of it."
+          value={context.selfRole}
+          onChange={(value) => onChange({ selfRole: value })}
+          tone="from"
+        />
+        <RoleSelector
+          label="They are"
+          hint="The other person."
+          value={context.otherRole}
+          onChange={(value) => onChange({ otherRole: value })}
+          tone="to"
+        />
+      </div>
+      <div className="max-w-md">
+        <Select
+          label="Relationship"
+          placeholder="Choose a relationship…"
+          value={context.relationship ?? ''}
+          onChange={(event) => onChange({ relationship: event.target.value })}
+          options={RELATIONSHIPS.map((option) => ({ value: option.label, label: option.label }))}
+        />
+      </div>
+    </section>
   );
 }

@@ -112,7 +112,7 @@ export const THEMES: readonly ThemeDefinition[] = [
   },
 ] as const;
 
-export const DEFAULT_THEME: ThemeId = 'console';
+export const DEFAULT_THEME: ThemeId = 'editorial';
 
 const STORAGE_KEY = 'context-switch:theme';
 const FONT_LINK_ID = 'cs-theme-fonts';

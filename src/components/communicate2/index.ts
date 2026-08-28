@@ -1,0 +1,1 @@
+export { CommunicateView } from './CommunicateView';
