@@ -42,6 +42,11 @@ export {
   CONFLICT_ALEX_SAM_CONVERSATION,
 } from './conflictAlexSam';
 export {
+  SATURDAY_DINNER_CONVERSATION,
+  buildSaturdayDinner,
+  matchesSaturdayDinner,
+} from './conflictSaturdayDinner';
+export {
   safetyEscalation,
   SAFETY_ESCALATION_SOURCE_TEXT,
   SAFETY_ESCALATION_USER_MESSAGE,

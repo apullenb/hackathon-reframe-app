@@ -9,6 +9,7 @@ import {
   ACCEPTED_IMAGE_TYPES,
 } from '@/ai/vision';
 import { parseConversation, speakersFromParse } from '@/components/conflict/parseConversation';
+import { buildSaturdayDinner, matchesSaturdayDinner } from '@/fixtures';
 import { ConflictLensResult } from '@/components/conflict';
 import { Button, Card, CardBody, Textarea } from '@/components/ui';
 import { cn } from '@/lib/cn';
@@ -50,7 +51,8 @@ type Phase =
   | { kind: 'reading' }
   | { kind: 'review' }
   | { kind: 'analyzing' }
-  | { kind: 'result'; response: ConflictLensResponse; speakers: ConflictSpeaker[] }
+  /** `saved` marks a prepared analysis served because no provider answered. Always labelled. */
+  | { kind: 'result'; response: ConflictLensResponse; speakers: ConflictSpeaker[]; saved?: boolean }
   | { kind: 'error'; message: string };
 
 const STAGES = [
@@ -185,9 +187,16 @@ export function RepairView({
       }
       void analyze(body, speakers).then((result) => {
         if (!alive.current || runId.current !== id) return;
+        if (result.ok) {
+          setPhase({ kind: 'result', response: result.response, speakers });
+          return;
+        }
+        // Nothing answered. If this is a conversation we hold a prepared analysis for, show that
+        // rather than an error — it is an analysis of THIS conversation, and it says so on screen.
+        const saved = matchesSaturdayDinner(body) ? buildSaturdayDinner(speakers) : null;
         setPhase(
-          result.ok
-            ? { kind: 'result', response: result.response, speakers }
+          saved
+            ? { kind: 'result', response: saved, speakers, saved: true }
             : { kind: 'error', message: result.message },
         );
       });
@@ -267,6 +276,12 @@ export function RepairView({
   if (phase.kind === 'result') {
     return (
       <div className="space-y-5">
+        {phase.saved ? (
+          <p className="rounded-card border border-amber/40 bg-amber-soft p-3.5 text-sm font-semibold leading-relaxed text-amber-ink">
+            Saved analysis of this conversation. The live service did not respond, so this is a
+            prepared read of these same messages rather than a new one.
+          </p>
+        ) : null}
         <ConflictLensResult
           response={phase.response}
           speakers={phase.speakers}

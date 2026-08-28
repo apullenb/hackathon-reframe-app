@@ -6,7 +6,6 @@ import type {
   ContextSwitchError,
   ContextSwitchMode,
   ContextSwitchResponse,
-  ConflictLensResponse,
   ConflictSpeaker,
 } from '@/types/contracts';
 import { CommunicateView } from '@/components/communicate2';
@@ -21,7 +20,7 @@ import {
   FIXTURES,
   PREPARED_SCENARIOS,
   CONFLICT_ALEX_SAM_SPEAKERS,
-  CONFLICT_ALEX_SAM_CONVERSATION,
+  SATURDAY_DINNER_CONVERSATION,
 } from '@/fixtures';
 import { useAiRouter } from '@/hooks/useAiRouter';
 import { runConflictFirstRead } from '@/ai/firstRead';
@@ -158,11 +157,17 @@ export function App() {
     [router, context],
   );
 
+  /**
+   * Repair's worked example is the Saturday-dinner exchange, and it deliberately carries no
+   * prepared response here: loading it drops the user on the review screen so the normal flow
+   * runs from there. A prepared analysis of it exists and is served automatically if no provider
+   * answers (see `buildSaturdayDinner`), so this one path behaves the same whether the AI is up
+   * or completely down.
+   */
   const conflictExample = useMemo(
     () => ({
-      conversation: CONFLICT_ALEX_SAM_CONVERSATION,
+      conversation: SATURDAY_DINNER_CONVERSATION,
       speakers: CONFLICT_ALEX_SAM_SPEAKERS,
-      response: FIXTURES.conflictAlexSam as ConflictLensResponse,
     }),
     [],
   );

@@ -24,7 +24,11 @@ import type {
 } from '../src/types/contracts';
 import { validateResponse } from '../src/schemas';
 import {
+  CONFLICT_ALEX_SAM_CONVERSATION,
   CONFLICT_ALEX_SAM_SPEAKERS,
+  SATURDAY_DINNER_CONVERSATION,
+  buildSaturdayDinner,
+  matchesSaturdayDinner,
   ENGINEER_PM_UNFILTERED_TRANSLATION,
   FIXTURES,
   INVALID_RESPONSE_EXPECTED_ISSUE_PATH,
@@ -369,7 +373,143 @@ check(
   conflict.falseEquivalenceWarning === undefined,
 );
 
+
+section('Content tests — Conflict Lens fallback, the Saturday dinner');
+
+/**
+ * The stage fallback. It is served in place of a failed live analysis, so it is held to the same
+ * bar as everything else — and additionally has to bind to runtime speakers and refuse to fire on
+ * a conversation that is not the one it analyses.
+ */
+const dinnerSpeakers = [
+  { id: 'you', label: 'You', role: 'Spouse/partner', isUser: true },
+  { id: 'spouse-partner', label: 'Spouse/partner', role: 'Spouse/partner', isUser: false },
+];
+const dinner = buildSaturdayDinner(dinnerSpeakers);
+
+check('dinner', 'builds a response for two speakers with one marked as the user', dinner !== null);
+
+if (dinner) {
+  const dinnerResult = validateResponse('conflict_lens', dinner);
+  check(
+    'dinner',
+    'passes the same schema a live response passes',
+    dinnerResult.ok,
+    dinnerResult.ok ? '' : JSON.stringify(dinnerResult.issues),
+  );
+
+  check(
+    'dinner',
+    'participant speakerIds are stamped from the speakers passed in',
+    dinner.participants.map((participant) => participant.speakerId).join(',') ===
+      'you,spouse-partner',
+  );
+
+  const dinnerExcerpts = dinner.escalationPoints.map((point) => point.excerpt);
+  const normalizedConversation = SATURDAY_DINNER_CONVERSATION.replace(/[\u2018\u2019]/g, "'");
+  const notInConversation = dinnerExcerpts.filter(
+    (excerpt) => !normalizedConversation.includes(excerpt.replace(/[\u2018\u2019]/g, "'")),
+  );
+  check(
+    'dinner',
+    'every escalation excerpt is a real line from the conversation',
+    notInConversation.length === 0,
+    `not found: ${notInConversation.join(' | ')}`,
+  );
+
+  check(
+    'dinner',
+    'every escalation point pairs an observation with an effect',
+    dinner.escalationPoints.length > 0 &&
+      dinner.escalationPoints.every(
+        (point) => point.observation.trim().length > 0 && point.effect.trim().length > 0,
+      ),
+  );
+
+  check(
+    'dinner',
+    'coreProblem is not "they should communicate better"',
+    !/should communicate better|need to communicate better/i.test(dinner.coreProblem),
+  );
+
+  check(
+    'dinner',
+    'coreProblem lands on the decision, not on the dinner',
+    /joint decision|on behalf of/i.test(dinner.coreProblem),
+    `coreProblem: ${dinner.coreProblem}`,
+  );
+
+  check('dinner', 'a shared goal is identified', (dinner.sharedGoal ?? '').trim().length > 0);
+
+  check(
+    'dinner',
+    'every resolution option states a tradeoff',
+    dinner.resolutionOptions.every((option) => (option.tradeoff ?? '').trim().length > 0),
+  );
+
+  check(
+    'dinner',
+    'every inference carries its evidence',
+    dinner.participants.every((participant) =>
+      participant.possibleConcerns.every((concern) => (concern.evidence ?? '').trim().length > 0),
+    ),
+  );
+
+  check(
+    'dinner',
+    'speculative inferences say they are not stated in the conversation',
+    dinner.participants
+      .flatMap((participant) => participant.possibleConcerns)
+      .filter((concern) => concern.support === 'speculative')
+      .every((concern) => /not stated|cannot be determined|inferred/i.test(concern.evidence ?? '')),
+  );
+}
+
+check('dinner', 'refuses to bind when there is only one speaker', buildSaturdayDinner([]) === null);
+
+check(
+  'dinner',
+  'refuses to bind when no speaker is marked as the user',
+  buildSaturdayDinner([
+    { id: 'a', label: 'A', role: 'x', isUser: false },
+    { id: 'b', label: 'B', role: 'y', isUser: false },
+  ]) === null,
+);
+
+check(
+  'dinner',
+  'matches its own conversation',
+  matchesSaturdayDinner(SATURDAY_DINNER_CONVERSATION),
+);
+
+check(
+  'dinner',
+  'still matches with three messages dropped, as OCR may do',
+  matchesSaturdayDinner(
+    SATURDAY_DINNER_CONVERSATION.split('\n').slice(0, -3).join('\n'),
+  ),
+);
+
+check(
+  'dinner',
+  'does NOT match the Alex and Sam kitchen conversation',
+  !matchesSaturdayDinner(CONFLICT_ALEX_SAM_CONVERSATION),
+);
+
+check(
+  'dinner',
+  'does NOT match a different argument about a family dinner on Saturday',
+  !matchesSaturdayDinner(
+    [
+      'Them: Are we still hosting your mother on Saturday?',
+      'You: Yes, I said we would make it work.',
+      'Them: I wish you had asked me first.',
+    ].join('\n'),
+  ),
+);
+
 section('Content tests — safety escalation (spec §20)');
+
 
 check(
   'safety',
