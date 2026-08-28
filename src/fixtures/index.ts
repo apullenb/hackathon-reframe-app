@@ -4,7 +4,7 @@
  * Every fixture here is typed as its response type and every one of them still goes through
  * `validateResponse()` — in `scripts/validate-fixtures.ts` at build time and in the AI client
  * at run time. A fixture that skipped the schema would hide exactly the bug the schema exists
- * to catch (CLAUDE.md).
+ * to catch.
  */
 
 import type {

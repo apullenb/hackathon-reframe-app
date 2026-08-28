@@ -1,6 +1,5 @@
 /**
- * Deterministic fixture client — the demo-safe path that works with zero configuration
- * (CLAUDE.md, spec §16/§21).
+ * Deterministic fixture client — the demo-safe path that works with zero configuration.
  *
  * Holds no key and makes no network call. Fixtures go through `validateResponse()` exactly
  * like a live response: a fixture that skipped the gate would hide the bug the gate exists

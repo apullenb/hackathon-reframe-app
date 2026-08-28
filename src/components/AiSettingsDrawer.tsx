@@ -22,7 +22,7 @@ type AiSettingsDrawerProps = {
 };
 
 /**
- * The bring-your-own-key drawer (CLAUDE.md, spec §16).
+ * The bring-your-own-key drawer.
  *
  * Only reachable when the dev proxy is unusable. When the proxy is available the drawer says so
  * and never asks for a key — a key in the browser is strictly worse, so we don't invite it.

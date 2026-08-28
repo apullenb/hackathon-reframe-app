@@ -480,8 +480,6 @@ reset the conversation**.
 **Start over** in the header returns the app to its starting state and clears any
 user-supplied key.
 
-For the full presenter's walkthrough with timings, see [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md).
-
 ## Themes
 
 Eight themes, switchable at runtime from **Settings → Appearance**: Editorial (the default),
@@ -647,16 +645,28 @@ Two things to know before trusting the picker:
   audited; four themes have. The per-theme **Draft** badges read the registry flag and are
   correct.
 
-## Build log
+## Design decisions
 
-Decisions, failures, timings, and honest status live in
-[`HACKATHON_BUILD_LOG.md`](HACKATHON_BUILD_LOG.md) — including **D-001** (the no-server
-tradeoff), **D-004**/**D-005**/**D-007** (schemas stricter than the types), **D-008** (the
-jargon boolean), **D-009** (refusing to fake a custom translation), **D-013** (removing "demo"
-vocabulary from the UI while keeping internal identifiers), **D-014** (style as a swappable
-theme layer, and why colours are `R G B` triplets), **D-015** (the multi-provider relay with
-failover, and why the browser path stays Anthropic-only), and the open item tracking unverified
-live AI.
+The decisions that most shaped this build:
 
-Note that D-014 was written when four themes existed; eight ship now, and
-`src/styles/applyTheme.ts` is the current record of which are audited.
+- **No server.** Live AI reaches the provider through a Vite dev-server middleware plugin that
+  holds the key in the Node process. A statically hosted build has no Node process, so live AI
+  there requires a user-supplied key — a real tradeoff, described under *Architecture* above.
+- **Schemas stricter than the types.** Every result field is optional in the original contract,
+  so an empty result would validate and render a blank screen. The Zod gate closes that, and
+  requires Decode's "what you cannot know" list to be non-empty: a read claiming nothing is
+  unknowable has failed the product rule.
+- **Refusing to fake a translation.** When prepared responses are the only thing available and
+  the text is the user's own, the app refuses with an explanation rather than handing back an
+  unrelated prepared answer.
+- **Style as a swappable layer.** Colour, radius, shadow and gradient live in CSS custom
+  properties, so changing theme is a runtime token swap rather than a rebuild. Colours are
+  stored as `R G B` triplets because the utility layer wraps them in `rgb(var(--token) / alpha)`;
+  a hex value there silently breaks every opacity modifier. `src/styles/applyTheme.ts` is the
+  current record of which themes are contrast-audited.
+- **A multi-provider relay with failover.** An ordered provider chain moves on when one fails.
+  It paid for itself when the primary account ran out of credit mid-build and the app kept
+  working without a code change.
+- **The three-way jargon control maps onto a boolean**, so "remove" and "reduce" currently
+  behave identically at the prompt level. Recorded here rather than hidden.
+- **Live AI output remains unverified** end to end against the prompts; the transport is proven.

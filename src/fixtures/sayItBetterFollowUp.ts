@@ -4,7 +4,7 @@
  *
  * This is the Honesty Guard in its visible form: a status update with no actual progress and
  * no reliable date cannot be written without inventing one of them, so the app asks instead of
- * complying (spec §7, CLAUDE.md "Honesty Guard"). Note there is deliberately no
+ * complying (the Honesty Guard). Note there is deliberately no
  * `sendableMessage` here — the schema's `superRefine` treats the two states as mutually
  * exclusive.
  *

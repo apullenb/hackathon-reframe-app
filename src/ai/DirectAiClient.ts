@@ -1,5 +1,5 @@
 /**
- * Bring-your-own-key client (CLAUDE.md `byok`) — used ONLY when the dev proxy is unreachable
+ * Bring-your-own-key client — used ONLY when the dev proxy is unreachable
  * and the user has pasted their own key.
  *
  * ============================ KEY HANDLING (AUDIT POINT) ============================
