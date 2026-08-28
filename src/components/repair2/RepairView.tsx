@@ -1,49 +1,27 @@
-/**
- * Repair — conflict resolution.
- *
- * The user arrives holding an argument. This view carries them from "here is what happened" to
- * "here is what each of us was saying, and here is what it was actually about". The analysis
- * itself lives elsewhere: `analyze` is supplied by the parent, and `ConflictLensResult` renders
- * the map. What lives here is the path between them.
- *
- * Two equal ways in, on purpose. A screenshot is what most people actually have, and a
- * description in their own words is what most people actually want to give. Neither is the
- * fallback for the other.
- *
- * The one usability rule this file exists to protect: a free-text description is never sent
- * back to be reformatted. If the text does not read as a `Name: message` transcript, it goes
- * straight to analysis with two plain speakers. Nobody is asked to retype their argument into
- * a format before they can be helped.
- */
-
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Check, ImageUp, Loader2, MessageSquareHeart, PenLine } from 'lucide-react';
+import { ImageUp, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
+import type { CommunicationContext, ConflictLensResponse, ConflictSpeaker } from '@/types/contracts';
+import type { ConflictFirstRead } from '@/schemas/conflictFirstRead';
 import {
-  ConflictLensResult,
-  ScreenshotUpload,
-  SpeakerConfirmation,
-  parseConversation,
-  speakersFromParse,
-} from '@/components/conflict';
-import type { ParseResult } from '@/components/conflict';
-import { ErrorFallback } from '@/components/shared';
-import { Button, Card, CardBody, CardHeader, Textarea } from '@/components/ui';
-import {
-  CONFLICT_ALEX_SAM_CONVERSATION,
-  CONFLICT_ALEX_SAM_SPEAKERS,
-} from '@/fixtures/conflictAlexSam';
+  describeImageProblem,
+  extractConversationFromImage,
+  fileToImagePayload,
+  ACCEPTED_IMAGE_TYPES,
+} from '@/ai/vision';
+import { parseConversation, speakersFromParse } from '@/components/conflict/parseConversation';
+import { ConflictLensResult } from '@/components/conflict';
+import { Button, Card, CardBody, Textarea } from '@/components/ui';
 import { cn } from '@/lib/cn';
-import type {
-  ConflictLensResponse,
-  ConflictSpeaker,
-  ContextSwitchError,
-} from '@/types/contracts';
 
 /**
- * The built-in example. Optional: the parent may hand over its own copy, and if it includes a
- * ready response the example is shown without a round-trip. Otherwise the fixture is used and
- * `analyze` runs as normal.
+ * Repair — work out what an argument is actually about.
+ *
+ * Three screens, deliberately. An earlier version made the user upload, wait, accept a
+ * transcript, and then ask for analysis — four decisions to get one answer. Now: put it in and
+ * press Analyze; check the conversation came out right, editing any line by clicking it; ask for
+ * the read. Nothing else is asked of anyone mid-argument.
  */
+
 export type RepairExample = {
   conversation: string;
   speakers: ConflictSpeaker[];
@@ -51,155 +29,162 @@ export type RepairExample = {
 };
 
 export type RepairViewProps = {
-  /** Who the other person is, for natural phrasing. */
   otherPerson: string;
-  /** Runs the conflict analysis. Resolves to the validated response, or an error to display. */
   analyze: (
     conversation: string,
     speakers: ConflictSpeaker[],
   ) => Promise<{ ok: true; response: ConflictLensResponse } | { ok: false; message: string }>;
-  /** Loads the built-in example conversation. */
   onLoadExample: () => void;
-  /** Overrides the built-in example, and can carry a ready response to show instantly. */
-  example?: RepairExample;
+  firstRead?: (
+    conversation: string,
+    speakers: ConflictSpeaker[],
+  ) => Promise<ConflictFirstRead | null>;
+  example: RepairExample;
+  context: Partial<CommunicationContext>;
 };
 
-/** Where the user is in the flow. The conversation text lives outside this, so it survives all of it. */
+type Message = { id: string; speaker: string; text: string };
+
 type Phase =
   | { kind: 'input' }
-  | { kind: 'confirm'; parse: ParseResult }
+  | { kind: 'reading' }
+  | { kind: 'review' }
   | { kind: 'analyzing' }
   | { kind: 'result'; response: ConflictLensResponse; speakers: ConflictSpeaker[] }
   | { kind: 'error'; message: string };
 
-/** What was actually submitted, so Try again repeats it exactly. */
-type Submission = { conversation: string; speakers: ConflictSpeaker[] };
-
-/**
- * Plain-language stages for the wait. They advance on a timer because one non-streaming call
- * reports no progress, and naming the steps honestly beats a bare spinner or a fake percentage.
- */
 const STAGES = [
-  'Reading what each person said',
-  'Noticing where it turned',
+  'Reading it through',
+  'Separating what happened from what was assumed',
+  'Finding where it turned',
   'Working out what it is actually about',
-  'Putting together what you could say next',
-] as const;
-
+];
 const STAGE_MS = 900;
 
-/**
- * Is this a pasted conversation, or is it someone telling us what happened?
- *
- * The bar for "conversation" is deliberately high: two distinct speaker labels. One label, or
- * three, or none, all mean the parse is not confident enough to be worth interrupting the user
- * over — so those go straight to analysis with plain speakers. A description is never bounced
- * back to be reformatted, and the full text reaches the analysis either way; only the names
- * differ.
- */
-function readsAsConversation(parse: ParseResult): boolean {
-  return parse.problem === 'none' && parse.speakerLabels.length === 2;
+/** Whichever label reads as the person using the app, falling back to whoever spoke first. */
+function pickSelf(labels: string[]): string {
+  return labels.find((l) => l.trim().toLowerCase() === 'you') ?? labels[0];
 }
 
-/** A relationship that just repeats the name adds nothing under it, so it is dropped. */
-function withoutRedundantRoles(speakers: ConflictSpeaker[]): ConflictSpeaker[] {
-  return speakers.map((speaker) =>
-    speaker.role.toLocaleLowerCase() === speaker.label.toLocaleLowerCase()
-      ? { ...speaker, role: '' }
-      : speaker,
-  );
-}
-
-/** Two speakers for a description, so the map still has a "you" side and a "them" side. */
-function plainSpeakers(other: string): ConflictSpeaker[] {
-  return [
-    { id: 'you', label: 'You', role: '', isUser: true },
-    { id: 'them', label: other, role: '', isUser: false },
-  ];
-}
+let seq = 0;
+const nextId = () => `m${(seq += 1)}`;
 
 /**
- * The lead is an even-handed one-glance summary, so it must never be the first thing read when
- * the response says this exchange should not be split down the middle. In that case the lead is
- * dropped and `ConflictLensResult`'s own notice — which it renders above everything — leads
- * instead. The notice itself is never touched.
+ * Transcription labels bubbles by position when the screenshot shows no names, which is honest
+ * but unreadable on screen. Every mainstream chat app puts the device owner on the right, so map
+ * it to real words — and the review screen lets the user correct it if their app is unusual.
  */
-function leadIsAppropriate(response: ConflictLensResponse): boolean {
-  if (response.falseEquivalenceWarning !== undefined) return false;
-  const safety = response.safety;
-  if (safety === undefined) return true;
-  if (!safety.allowStandardOutput) return false;
-  return safety.category === 'none' || safety.category === 'high_stakes_professional';
+function relabel(label: string, other: string): string {
+  const key = label.trim().toLowerCase();
+  if (key === 'right' || key === 'me') return 'You';
+  if (key === 'left' || key === 'them') return other;
+  return label;
 }
 
-type LeadLine = { speakerId: string; name: string; says: string };
-
-function leadLines(response: ConflictLensResponse, speakers: ConflictSpeaker[]): LeadLine[] {
-  return response.participants.map((participant) => {
-    const match = speakers.find((speaker) => speaker.id === participant.speakerId);
-    return {
-      speakerId: participant.speakerId,
-      name: match?.label ?? participant.speakerId,
-      says: participant.whatTheyMayBeTryingToSay,
-    };
-  });
+function toMessages(raw: string, other: string): Message[] {
+  const parsed = parseConversation(raw);
+  if (parsed.lines.length > 0 && parsed.problem !== 'no_speakers') {
+    return parsed.lines.map((line) => ({
+      id: nextId(),
+      speaker: relabel(line.speakerLabel || 'You', other),
+      text: line.text,
+    }));
+  }
+  // Free-text description: keep it whole rather than forcing it into a transcript shape.
+  return [{ id: nextId(), speaker: 'You', text: raw.trim() }];
 }
-
-/** `analyze` hands back a message; `ErrorFallback` wants the standard shape. */
-function asDisplayError(message: string): ContextSwitchError {
-  return { kind: 'provider_error', userMessage: message, fixtureAvailable: true };
-}
-
-const BUILT_IN_EXAMPLE: RepairExample = {
-  conversation: CONFLICT_ALEX_SAM_CONVERSATION,
-  speakers: CONFLICT_ALEX_SAM_SPEAKERS,
-};
 
 export function RepairView({
   otherPerson,
   analyze,
   onLoadExample,
-  example = BUILT_IN_EXAMPLE,
+  firstRead,
+  example,
+  context,
 }: RepairViewProps): JSX.Element {
-  const trimmedOther = otherPerson.trim();
-  const other = trimmedOther.length > 0 ? trimmedOther : 'the other person';
+  const other = otherPerson.trim() || 'the other person';
 
-  const [conversation, setConversation] = useState('');
   const [phase, setPhase] = useState<Phase>({ kind: 'input' });
-  const [userLabel, setUserLabel] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [fileProblem, setFileProblem] = useState<string | null>(null);
+  const [extra, setExtra] = useState('');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [stage, setStage] = useState(0);
-  const [submission, setSubmission] = useState<Submission | null>(null);
+  const [preview, setPreview] = useState<ConflictFirstRead | null>(null);
+  const [userSpeaker, setUserSpeaker] = useState<string | null>(null);
 
-  /** Ignore a result that arrives after the user moved on, or after unmount. */
-  const runIdRef = useRef(0);
-  const aliveRef = useRef(true);
-  useEffect(
-    () => () => {
-      aliveRef.current = false;
-    },
-    [],
-  );
+  const runId = useRef(0);
+  /** What was last sent, so "try again" replays it without rebuilding from screen state. */
+  const lastRun = useRef<{ body: string; speakerSource: string } | null>(null);
+  const alive = useRef(true);
+  // Set on mount as well as cleared on unmount: StrictMode mounts, unmounts, and remounts, and a
+  // cleanup-only guard stays false forever after that — silently dropping every result.
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
 
-  const analyzing = phase.kind === 'analyzing';
+  // Release the object URL rather than leaking it, and never keep the image around.
+  useEffect(() => {
+    if (!file) { setPreviewUrl(null); return undefined; }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   useEffect(() => {
-    if (!analyzing) return undefined;
-    if (stage >= STAGES.length - 1) return undefined;
-    const timer = window.setTimeout(() => setStage((current) => current + 1), STAGE_MS);
-    return () => window.clearTimeout(timer);
-  }, [analyzing, stage]);
+    if (phase.kind !== 'analyzing' || stage >= STAGES.length - 1) return undefined;
+    const t = window.setTimeout(() => setStage((s) => s + 1), STAGE_MS);
+    return () => window.clearTimeout(t);
+  }, [phase.kind, stage]);
 
-  const runAnalysis = useCallback(
-    (text: string, speakers: ConflictSpeaker[]) => {
-      const runId = runIdRef.current + 1;
-      runIdRef.current = runId;
+  const chooseFile = useCallback((picked: File | null) => {
+    if (!picked) { setFile(null); setFileProblem(null); return; }
+    const problem = describeImageProblem(picked);
+    setFileProblem(problem);
+    setFile(problem ? null : picked);
+  }, []);
 
-      setSubmission({ conversation: text, speakers });
+  /**
+   * Fire the read. `transcript` is what gets analysed; `speakerSource` is what we look at to work
+   * out who the two people are — the same string when it came from a conversation, and just the
+   * roles when someone typed it in their own words.
+   */
+  const startAnalysis = useCallback(
+    (body: string, speakerSource: string) => {
+      const id = runId.current + 1;
+      runId.current = id;
+      lastRun.current = { body, speakerSource };
+
+      const parsed = parseConversation(speakerSource);
+      const speakers: ConflictSpeaker[] =
+        parsed.speakerLabels.length === 2
+          ? speakersFromParse(parsed, userSpeaker ?? pickSelf(parsed.speakerLabels), {
+              self: context.selfRole ?? 'You',
+              other: context.otherRole ?? other,
+            })
+          : [
+              { id: 'you', label: 'You', role: context.selfRole ?? 'You', isUser: true },
+              { id: 'them', label: other, role: context.otherRole ?? other, isUser: false },
+            ];
+
       setStage(0);
+      setPreview(null);
       setPhase({ kind: 'analyzing' });
 
-      void analyze(text, speakers).then((result) => {
-        if (!aliveRef.current || runIdRef.current !== runId) return;
+      // Two calls in parallel: a short first read that lands quickly, and the full analysis
+      // behind it. Nobody stares at a spinner waiting for the whole thing.
+      if (firstRead) {
+        void firstRead(body, speakers).then((quick) => {
+          if (alive.current && runId.current === id && quick) setPreview(quick);
+        });
+      }
+      void analyze(body, speakers).then((result) => {
+        if (!alive.current || runId.current !== id) return;
         setPhase(
           result.ok
             ? { kind: 'result', response: result.response, speakers }
@@ -207,165 +192,207 @@ export function RepairView({
         );
       });
     },
-    [analyze],
+    [userSpeaker, context, other, analyze, firstRead],
   );
 
-  /** Step 1 → step 2 or straight to step 3, depending on how the text reads. */
-  const handleContinue = useCallback(() => {
-    const text = conversation.trim();
-    if (text.length === 0) return;
+  /** Step 1 → step 2. Transcribes the screenshot when there is one, then shows the conversation. */
+  const handleAnalyze = useCallback(async () => {
+    const typed = extra.trim();
+    if (!file && !typed) return;
 
-    const parse = parseConversation(text);
-    if (readsAsConversation(parse)) {
-      setUserLabel(null);
-      setPhase({ kind: 'confirm', parse });
+    if (!file) {
+      // Written in their own words: there is nothing to proofread, so don't invent a step. A
+      // pasted transcript still gets the review screen — those are the ones that come out wrong.
+      const parsed = parseConversation(typed);
+      if (parsed.problem === 'no_speakers' || parsed.lines.length === 0) {
+        startAnalysis(typed, '');
+        return;
+      }
+      setMessages(toMessages(typed, other));
+      setExtra('');
+      setPhase({ kind: 'review' });
       return;
     }
 
-    runAnalysis(text, plainSpeakers(other));
-  }, [conversation, other, runAnalysis]);
+    setPhase({ kind: 'reading' });
+    const payload = await fileToImagePayload(file);
+    const outcome = await extractConversationFromImage(payload);
+    if (!alive.current) return;
+    // The image has done its job. Drop it.
+    setFile(null);
 
-  const handleConfirmSpeakers = useCallback(() => {
-    if (phase.kind !== 'confirm' || userLabel === null) return;
-    const speakers = withoutRedundantRoles(
-      speakersFromParse(phase.parse, userLabel, { self: 'You', other }),
-    );
-    runAnalysis(conversation.trim(), speakers);
-  }, [conversation, other, phase, runAnalysis, userLabel]);
+    if (!outcome.ok) {
+      setPhase({ kind: 'error', message: outcome.error.userMessage });
+      return;
+    }
+    setMessages(toMessages(outcome.value.transcript, other));
+    setPhase({ kind: 'review' });
+  }, [file, extra, other, startAnalysis]);
 
-  /**
-   * The example is shown, not just loaded: it fills the box and runs, because someone asking to
-   * see an example wants to see the finished thing, not a filled-in form.
-   */
-  const handleShowExample = useCallback(() => {
+  /** Run the same input again — used by "try again" on the result. */
+  const replay = useCallback(() => {
+    const last = lastRun.current;
+    if (last) startAnalysis(last.body, last.speakerSource);
+  }, [startAnalysis]);
+
+  /** Step 2 → step 3. */
+  const handleUnderstand = useCallback(() => {
+    const transcript = messages
+      .map((m) => (m.speaker ? `${m.speaker}: ${m.text}` : m.text))
+      .join('\n');
+    const note = extra.trim();
+    startAnalysis(note ? `${transcript}\n\nAlso worth knowing: ${note}` : transcript, transcript);
+  }, [messages, extra, startAnalysis]);
+
+  const showExample = useCallback(() => {
     onLoadExample();
-    setConversation(example.conversation);
-    setUserLabel(null);
-
-    if (example.response === undefined) {
-      runAnalysis(example.conversation, example.speakers);
-      return;
+    setMessages(toMessages(example.conversation, other));
+    if (example.response) {
+      setPhase({ kind: 'result', response: example.response, speakers: example.speakers });
+    } else {
+      setPhase({ kind: 'review' });
     }
+  }, [example, onLoadExample, other]);
 
-    // A ready response means the example costs nothing to show. Regenerate still runs for real.
-    runIdRef.current += 1;
-    setSubmission({ conversation: example.conversation, speakers: example.speakers });
-    setPhase({ kind: 'result', response: example.response, speakers: example.speakers });
-  }, [example, onLoadExample, runAnalysis]);
-
-  const handleRetry = useCallback(() => {
-    if (submission === null) return;
-    runAnalysis(submission.conversation, submission.speakers);
-  }, [runAnalysis, submission]);
-
-  const backToInput = useCallback(() => {
-    runIdRef.current += 1;
+  const reset = useCallback(() => {
     setPhase({ kind: 'input' });
+    setMessages([]);
+    setExtra('');
+    setFile(null);
+    setPreview(null);
+    setUserSpeaker(null);
   }, []);
 
-  if (phase.kind === 'confirm') {
+  /* ── Result ─────────────────────────────────────────────────────────── */
+  if (phase.kind === 'result') {
     return (
-      <section className="w-full max-w-full space-y-6">
-        <SpeakerConfirmation
-          parse={phase.parse}
-          userLabel={userLabel}
-          onSelectUser={setUserLabel}
+      <div className="space-y-5">
+        <ConflictLensResult
+          response={phase.response}
+          speakers={phase.speakers}
+          onRegenerate={replay}
+          onEditContext={() => setPhase(messages.length > 0 ? { kind: 'review' } : { kind: 'input' })}
         />
+        <Button variant="outline" onClick={reset}>
+          Start a different one
+        </Button>
+      </div>
+    );
+  }
 
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            variant="primary"
-            size="lg"
-            leadingIcon={Check}
-            onClick={handleConfirmSpeakers}
-            disabled={userLabel === null}
-          >
-            That is right — continue
-          </Button>
-          <Button variant="ghost" size="md" leadingIcon={ArrowLeft} onClick={backToInput}>
-            Change what I wrote
-          </Button>
+  /* ── Error ──────────────────────────────────────────────────────────── */
+  if (phase.kind === 'error') {
+    return (
+      <Card tone="coral">
+        <CardBody className="space-y-3">
+          <h2 className="font-display text-xl text-ink">That didn’t go through</h2>
+          <p className="text-sm font-medium leading-relaxed text-ink-muted">{phase.message}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => setPhase(messages.length > 0 ? { kind: 'review' } : { kind: 'input' })}
+            >
+              {messages.length > 0 ? 'Back to the conversation' : 'Back'}
+            </Button>
+            <Button variant="outline" onClick={showExample}>
+              Show the example instead
+            </Button>
+          </div>
+        </CardBody>
+      </Card>
+    );
+  }
+
+  /* ── Reading the screenshot ─────────────────────────────────────────── */
+  if (phase.kind === 'reading') {
+    return (
+      <section className="space-y-4" aria-live="polite">
+        <h2 className="font-display text-2xl text-ink">Reading the screenshot</h2>
+        <p className="max-w-2xl text-base leading-relaxed text-ink-muted">
+          Pulling the messages out. You will get to check and fix them before anything is analysed.
+        </p>
+        <div className="flex items-center gap-3 rounded-card border border-line bg-surface px-4 py-3 shadow-card">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden="true" />
+          <span className="text-sm font-semibold text-ink">Working…</span>
         </div>
-
-        {userLabel === null ? (
-          <p className="text-base leading-relaxed text-ink-muted">
-            Pick which one is you first. It only decides which side gets labelled as yours.
-          </p>
-        ) : null}
       </section>
     );
   }
 
+  /* ── Analyzing, with the first read filling in as soon as it lands ──── */
   if (phase.kind === 'analyzing') {
     return (
-      <section aria-labelledby="repair-working-heading" className="w-full max-w-full space-y-5">
-        <div className="min-w-0">
-          <h2
-            id="repair-working-heading"
-            className="font-display text-2xl leading-tight text-ink"
-          >
+      <section className="space-y-5" aria-labelledby="working">
+        <div>
+          <h2 id="working" className="font-display text-2xl text-ink">
             Reading it through
           </h2>
           <p className="mt-2 max-w-2xl text-base leading-relaxed text-ink-muted">
-            Taking both sides seriously takes a moment. This usually lands in under a minute.
+            The first read appears as soon as it is ready, and the rest fills in behind it.
           </p>
         </div>
 
-        <Card elevation="card">
-          <CardBody>
-            <ol className="space-y-2.5" aria-live="polite" aria-atomic="false" aria-busy="true">
-              {STAGES.map((label, index) => {
-                const done = index < stage;
-                const active = index === stage;
+        {preview ? (
+          <section
+            aria-label="A first read"
+            className="space-y-3 rounded-card border border-line bg-surface p-5 shadow-card motion-safe:animate-reveal-up"
+          >
+            <p className="font-mono text-xs font-semibold uppercase tracking-widest text-primary">
+              A first read · still working
+            </p>
+            <p className="text-base font-medium leading-relaxed text-ink">
+              {preview.neutralSummary}
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {preview.sides.map((side) => (
+                <div key={side.who} className="rounded-card border border-line bg-paper-sunk/50 p-3.5">
+                  <p className="text-sm font-bold text-ink">
+                    {side.who.trim().toLowerCase() === 'you'
+                      ? 'What you seem to be saying'
+                      : `${side.who} seems to be saying`}
+                  </p>
+                  <p className="mt-1 text-sm font-medium leading-relaxed text-ink-muted">
+                    {side.seemsToBeSaying}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-card border border-teal/30 bg-teal-soft p-3.5">
+              <p className="text-sm font-bold text-teal-ink">
+                What it looks like it is actually about
+              </p>
+              <p className="mt-1 text-sm font-medium leading-relaxed text-ink">
+                {preview.likelyAbout}
+              </p>
+            </div>
+          </section>
+        ) : null}
 
+        <Card>
+          <CardBody>
+            <ol className="space-y-2.5" aria-live="polite" aria-busy="true">
+              {STAGES.map((label, i) => {
+                const done = i < stage;
+                const active = i === stage;
                 return (
                   <li
                     key={label}
                     className={cn(
-                      'flex items-center gap-3 rounded-card border px-4 py-3',
-                      'transition-colors duration-300 ease-smooth',
-                      done && 'border-teal/30 bg-teal-soft',
-                      active && 'border-primary/35 bg-primary-soft',
-                      !done && !active && 'border-line bg-paper-sunk/50',
+                      'flex items-center gap-3 rounded-card border px-4 py-3 text-sm font-semibold transition-colors',
+                      done && 'border-teal/30 bg-teal-soft text-teal-ink',
+                      active && 'border-primary/35 bg-primary-soft text-ink',
+                      !done && !active && 'border-line text-ink-muted',
                     )}
                   >
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-chip border',
-                        done && 'border-teal/40 bg-teal-soft text-teal-ink',
-                        active && 'border-primary/40 bg-surface text-primary',
-                        !done && !active && 'border-line-strong bg-surface text-ink-muted',
-                      )}
-                    >
-                      {done ? (
-                        <Check className="h-4 w-4" strokeWidth={3} />
-                      ) : active ? (
-                        <Loader2 className="h-4 w-4 motion-safe:animate-spin" />
-                      ) : null}
-                    </span>
-
-                    <span
-                      className={cn(
-                        'min-w-0 flex-1 text-base font-semibold leading-snug',
-                        done && 'text-teal-ink',
-                        active && 'text-ink',
-                        !done && !active && 'text-ink-muted',
-                      )}
-                    >
-                      {label}
-                    </span>
-
-                    <span
-                      className={cn(
-                        'shrink-0 text-sm font-semibold',
-                        done && 'text-teal-ink',
-                        active && 'text-primary',
-                        !done && !active && 'text-ink-muted',
-                      )}
-                    >
-                      {done ? 'Done' : active ? 'Working' : 'Next'}
-                    </span>
+                    {active ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden="true" />
+                    ) : (
+                      <span
+                        className={cn('h-2 w-2 rounded-full', done ? 'bg-teal' : 'bg-line-strong')}
+                        aria-hidden="true"
+                      />
+                    )}
+                    {label}
+                    <span className="sr-only">{done ? 'done' : active ? 'in progress' : 'waiting'}</span>
                   </li>
                 );
               })}
@@ -376,136 +403,244 @@ export function RepairView({
     );
   }
 
-  if (phase.kind === 'result') {
-    const lines = leadIsAppropriate(phase.response) ? leadLines(phase.response, phase.speakers) : [];
-
+  /* ── Step 2: check the conversation ─────────────────────────────────── */
+  if (phase.kind === 'review') {
+    const speakers = [...new Set(messages.map((m) => m.speaker).filter(Boolean))];
     return (
-      <section className="w-full max-w-full space-y-8">
-        {lines.length > 0 ? (
-          <Card tone="primary" elevation="lift" className="motion-safe:animate-reveal-up">
-            <CardHeader
-              eyebrow="The short version"
-              title="What each of you seems to be saying"
-              icon={MessageSquareHeart}
-            />
-            <CardBody className="space-y-5">
-              <ul className="space-y-3">
-                {lines.map((line) => (
-                  <li key={line.speakerId} className="min-w-0">
-                    <p className="font-display text-lg leading-snug text-ink">{line.name}</p>
-                    <p className="mt-0.5 min-w-0 break-words text-base leading-relaxed text-ink">
-                      {line.says}
-                    </p>
-                  </li>
-                ))}
-              </ul>
+      <section className="space-y-5">
+        <div>
+          <h2 className="font-display text-2xl text-ink">Does this look right?</h2>
+          <p className="mt-2 max-w-2xl text-base leading-relaxed text-ink-muted">
+            Click any message to fix it. Nothing is analysed until you say so.
+          </p>
+        </div>
 
-              <div className="border-t border-line pt-4">
-                <h3 className="font-display text-lg leading-snug text-ink">
-                  What the argument is actually about
-                </h3>
-                <p className="mt-1 min-w-0 break-words text-base leading-relaxed text-ink">
-                  {phase.response.coreProblem}
-                </p>
-              </div>
-            </CardBody>
-          </Card>
+        <ul className="space-y-2">
+          {messages.map((message) => {
+            const editing = editingId === message.id;
+            return (
+              <li key={message.id}>
+                {editing ? (
+                  <div className="space-y-2 rounded-card border-2 border-primary bg-surface p-3.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-ink-muted">
+                        Who said it
+                        <input
+                          value={message.speaker}
+                          onChange={(e) =>
+                            setMessages((prev) =>
+                              prev.map((m) => (m.id === message.id ? { ...m, speaker: e.target.value } : m)),
+                            )
+                          }
+                          className="ml-2 min-h-tap rounded-card border border-line bg-paper-sunk/50 px-3 text-sm font-semibold normal-case tracking-normal text-ink"
+                        />
+                      </label>
+                    </div>
+                    <Textarea
+                      label="What they said"
+                      hideLabel
+                      rows={2}
+                      value={message.text}
+                      onChange={(e) =>
+                        setMessages((prev) =>
+                          prev.map((m) => (m.id === message.id ? { ...m, text: e.target.value } : m)),
+                        )
+                      }
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <Button onClick={() => setEditingId(null)}>Done</Button>
+                      <Button
+                        variant="ghost"
+                        leadingIcon={Trash2}
+                        onClick={() => {
+                          setMessages((prev) => prev.filter((m) => m.id !== message.id));
+                          setEditingId(null);
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(message.id)}
+                    className="group flex min-h-tap w-full items-start gap-3 rounded-card border border-line bg-surface p-3.5 text-left shadow-card transition-colors hover:border-primary/45"
+                  >
+                    <span className="min-w-[5rem] shrink-0 text-sm font-bold text-primary">
+                      {message.speaker || 'You'}
+                    </span>
+                    <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm font-medium leading-relaxed text-ink">
+                      {message.text}
+                    </span>
+                    <Pencil
+                      className="mt-0.5 h-4 w-4 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100"
+                      aria-hidden="true"
+                    />
+                    <span className="sr-only">Edit this message</span>
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+
+        <Button
+          variant="outline"
+          leadingIcon={Plus}
+          onClick={() => {
+            const id = nextId();
+            setMessages((prev) => [...prev, { id, speaker: other, text: '' }]);
+            setEditingId(id);
+          }}
+        >
+          Add a message
+        </Button>
+
+        {speakers.length === 2 ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-card border border-line bg-surface px-4 py-3 shadow-card">
+            <span className="text-sm font-bold text-ink">Which one is you?</span>
+            {speakers.map((name) => {
+              const selected = (userSpeaker ?? pickSelf(speakers)) === name;
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => setUserSpeaker(name)}
+                  aria-pressed={selected}
+                  className={cn(
+                    'min-h-tap rounded-chip border px-4 text-sm font-bold transition-colors',
+                    selected
+                      ? 'border-primary bg-primary-soft text-primary'
+                      : 'border-line-strong bg-surface text-ink-muted hover:border-primary/45',
+                  )}
+                >
+                  {name}
+                </button>
+              );
+            })}
+          </div>
         ) : null}
 
-        <ConflictLensResult
-          response={phase.response}
-          speakers={phase.speakers}
-          onEditContext={backToInput}
-          onRegenerate={handleRetry}
-        />
-      </section>
-    );
-  }
-
-  if (phase.kind === 'error') {
-    return (
-      <section className="w-full max-w-full space-y-5">
-        <ErrorFallback
-          error={asDisplayError(phase.message)}
-          onRetry={handleRetry}
-          onUseFixture={handleShowExample}
-        />
-
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="outline" size="md" leadingIcon={ArrowLeft} onClick={backToInput}>
-            Back to what I wrote
-          </Button>
-          <p className="text-base leading-relaxed text-ink-muted">
-            Nothing you wrote was lost — it is still in the box.
+        {speakers.length > 2 ? (
+          <p className="rounded-card border border-amber/40 bg-amber-soft p-3.5 text-sm font-medium text-amber-ink">
+            There are {speakers.length} people here. This works best with two — remove or relabel
+            the extra messages, or carry on and it will treat it as you and {other}.
           </p>
+        ) : null}
+
+        <Textarea
+          label="Anything else worth knowing?"
+          hint="Optional. What led up to it, or what you were actually worried about."
+          rows={3}
+          value={extra}
+          onChange={(e) => setExtra(e.target.value)}
+        />
+
+        <div className="flex flex-wrap gap-2">
+          <Button size="lg" onClick={handleUnderstand} disabled={messages.length === 0}>
+            Help me understand this
+          </Button>
+          <Button variant="ghost" onClick={reset}>
+            Start again
+          </Button>
         </div>
       </section>
     );
   }
 
+  /* ── Step 1: put it in ──────────────────────────────────────────────── */
+  const ready = Boolean(file) || extra.trim().length > 0;
   return (
-    <section aria-labelledby="repair-start-heading" className="w-full max-w-full space-y-6">
-      <div className="min-w-0">
-        <h2 id="repair-start-heading" className="font-display text-2xl leading-tight text-ink">
-          What happened between you and {other}?
-        </h2>
+    <section className="space-y-5">
+      <div>
+        <h2 className="font-display text-2xl text-ink">What happened between you and {other}?</h2>
         <p className="mt-2 max-w-2xl text-base leading-relaxed text-ink-muted">
-          Show the conversation or just tell it in your own words. You will get both
-          perspectives, what the argument is actually about, and something you could say next.
-          Nothing here picks a winner.
+          Add a screenshot of the conversation, or just write what happened. Nothing here picks a
+          winner.
         </p>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
-        <div className="min-w-0 space-y-2">
-          <h3 className="flex items-center gap-2 font-display text-lg leading-snug text-ink">
-            <ImageUp aria-hidden="true" className="h-5 w-5 shrink-0 text-primary" />
-            Upload a screenshot
-          </h3>
-          <p className="text-base leading-relaxed text-ink-muted">
-            A photo or screenshot of the messages. The text comes out into the box, and you can
-            fix anything it read wrong.
-          </p>
-          <ScreenshotUpload onTranscript={setConversation} />
-        </div>
+      <label
+        className={cn(
+          'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-card-lg border-2 border-dashed p-8 text-center transition-colors',
+          file ? 'border-primary bg-primary-soft' : 'border-line-strong bg-surface hover:border-primary/50',
+        )}
+      >
+        <input
+          type="file"
+          accept={ACCEPTED_IMAGE_TYPES.join(',')}
+          className="sr-only"
+          onChange={(e) => chooseFile(e.target.files?.[0] ?? null)}
+        />
+        {previewUrl ? (
+          <>
+            <img
+              src={previewUrl}
+              alt="The screenshot you added"
+              className="max-h-48 rounded-card border border-line object-contain"
+            />
+            <span className="text-sm font-semibold text-primary">
+              {file?.name} · click to replace
+            </span>
+          </>
+        ) : (
+          <>
+            <ImageUp className="h-7 w-7 text-primary" aria-hidden="true" />
+            <span className="text-base font-bold text-ink">Add a screenshot</span>
+            <span className="max-w-sm text-sm font-medium leading-relaxed text-ink-muted">
+              One image — PNG, JPEG, WebP or GIF, up to 6MB. It is sent to the AI provider to read
+              the text, and is not stored.
+            </span>
+          </>
+        )}
+      </label>
 
-        <div className="min-w-0 space-y-2">
-          <h3 className="flex items-center gap-2 font-display text-lg leading-snug text-ink">
-            <PenLine aria-hidden="true" className="h-5 w-5 shrink-0 text-primary" />
-            Describe it or paste it
-          </h3>
-          <p className="text-base leading-relaxed text-ink-muted">
-            Paste the messages, or just write what happened. Either works — you do not need to
-            tidy it up first.
-          </p>
-          <Card elevation="card">
-            <CardBody>
-              <Textarea
-                label="The conversation, or what happened"
-                hideLabel
-                rows={10}
-                value={conversation}
-                onChange={(event) => setConversation(event.target.value)}
-                placeholder={`We argued about the same thing again last night. I brought up the kitchen and ${other} said I was nagging…`}
-              />
-            </CardBody>
-          </Card>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+      {file ? (
         <Button
-          variant="primary"
-          size="lg"
-          onClick={handleContinue}
-          disabled={conversation.trim().length === 0}
+          variant="ghost"
+          leadingIcon={X}
+          onClick={() => chooseFile(null)}
         >
-          Help me understand this
+          Remove screenshot
         </Button>
-        <Button variant="ghost" size="md" onClick={handleShowExample}>
+      ) : null}
+
+      {fileProblem ? (
+        <p className="rounded-card border border-coral/40 bg-coral-soft p-3.5 text-sm font-semibold text-coral-ink">
+          {fileProblem}
+        </p>
+      ) : null}
+
+      <Textarea
+        label={file ? 'Anything else worth knowing?' : 'Or describe what happened'}
+        hint={
+          file
+            ? 'Optional. What led up to it, or what you were actually worried about.'
+            : 'Paste the messages, or write it in your own words. Either works.'
+        }
+        rows={5}
+        value={extra}
+        onChange={(e) => setExtra(e.target.value)}
+      />
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button size="lg" disabled={!ready} onClick={() => void handleAnalyze()}>
+          Analyze
+        </Button>
+        <button
+          type="button"
+          onClick={showExample}
+          className="min-h-tap text-sm font-semibold text-primary underline decoration-primary/30 underline-offset-4 hover:decoration-primary"
+        >
           See an example
-        </Button>
+        </button>
       </div>
+      {!ready ? (
+        <p className="text-sm font-medium text-ink-muted">
+          Add a screenshot or describe what happened to continue.
+        </p>
+      ) : null}
     </section>
   );
 }

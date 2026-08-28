@@ -141,7 +141,10 @@ export function ConflictLensResult({
                 <span key={participant.speakerId} className="min-w-0">
                   {index > 0 ? <span aria-hidden="true" className="pr-2">·</span> : null}
                   <span className="break-words text-ink">{participant.displayName}</span>
-                  {participant.isUser ? <span className="pl-1">(you)</span> : null}
+                  {/* Skip the tag when the name already says it, so it never reads "You (you)". */}
+                  {participant.isUser && participant.displayName.trim().toLowerCase() !== 'you' ? (
+                    <span className="pl-1">(you)</span>
+                  ) : null}
                 </span>
               ))}
             </p>

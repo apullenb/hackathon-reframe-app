@@ -24,6 +24,7 @@ import {
   CONFLICT_ALEX_SAM_CONVERSATION,
 } from '@/fixtures';
 import { useAiRouter } from '@/hooks/useAiRouter';
+import { runConflictFirstRead } from '@/ai/firstRead';
 import { cn } from '@/lib/cn';
 
 /**
@@ -296,8 +297,12 @@ export function App() {
               <RepairView
                 otherPerson={context.otherRole ?? 'the other person'}
                 analyze={analyzeConflict}
+                firstRead={(conversation, speakers) =>
+                  runConflictFirstRead(conversation, speakers, context)
+                }
                 onLoadExample={() => undefined}
                 example={conflictExample}
+                context={context}
               />
             ) : (
               <p className="rounded-card border border-line bg-surface p-4 text-sm font-medium leading-relaxed text-ink-muted">
