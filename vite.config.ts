@@ -11,6 +11,9 @@ export default defineConfig(({ mode }) => {
   const aiMode = env.VITE_AI_MODE || env.AI_MODE || 'auto';
 
   return {
+    // GitHub Pages serves a project site from /<repo>/, so assets need that prefix. Set by the
+    // deploy workflow; local builds and `npm run dev` stay at '/'.
+    base: env.VITE_BASE || '/',
     plugins: [react(), aiProxyPlugin()],
     // Honor the PORT the harness assigns (autoPort in .claude/launch.json). Vite does not read
     // PORT on its own, so without this the launcher and the server would disagree about the
