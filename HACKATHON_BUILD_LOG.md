@@ -19,7 +19,7 @@
 
 ## Current Status
 
-**Phase:** 5 — Polish and demo hardening (complete except live-AI generation)  
+**Phase:** 8 — UI rebuild into the Human Observability Console (branch `ui-observability-console`)  
 **Demo status:** **Ready live and offline.** Rehearsed twice offline; live path verified 25/25 against a real model through the failover chain.  
 **Live AI status:** **Verified end to end against a real model — 25/25 checks.** Multi-provider relay with automatic failover; Anthropic rejects at billing and OpenAI serves, labelled honestly as `LIVE · OPENAI`. Anthropic key valid (`keyConfigured=true`, provider returns 400 not 401). Transport, auth, and request shape all verified end to end. **Model output still unverified: the Anthropic account has no credit balance**, so no generation has occurred. Re-run `npm run check:live` once credits are added. See F-010.  
 **Fixture fallback status:** Verified — 43/43 fixture assertions green, gate negative-tested  
@@ -375,6 +375,45 @@ Add an entry after every meaningful build phase. Copy the template for each entr
 
 - Add credits to either provider and run `npm run check:live` for a real-model verdict. Fix the hardcoded `text-white` on gradient slabs so dark themes can pass a contrast audit.
 
+### Milestone 8 — UI rebuild: Human Observability Console (in progress)
+
+**Time:** 17:45 CDT — in progress  
+**Phase/goal:** Rebuild the interface per `Context_Switch_UI_Experience_Build_Brief.md` into a twelve-feature human observability console, on branch `ui-observability-console`.
+
+**Actions taken:**
+
+- Read the UI brief in full, then the companion `Context_Switch_Adult_Communication_Project_Spec.md` (§13.1 P0, §17 contracts, §8 CBT layer) once it was supplied.
+- **Flagged that the companion spec was missing** rather than inventing its content; it arrived shortly after and changed the contract picture materially (see D-016).
+- Built the shared foundation centrally, since parallel agents cannot be allowed to diverge on it: `CurrentSituation` types and reducer, the twelve-feature registry, the practice contracts, and the `console` theme.
+- Enforced brief §9's state rules **in the reducer rather than by convention**: a suggestion can only become confirmed through an explicit user action, every suggestion records the tool that produced it, role changes never discard content, and entering serious mode forces humor off globally.
+- Launched two agents on disjoint slices (application shell; Inspect workspace).
+
+**What worked:**
+
+- The existing work maps onto the brief more cleanly than expected: `say_it_better`→Message Compiler, `decode_it`→Signal Decoder, `conflict_lens`→Conflict Trace, and the already-built screenshot OCR with editable transcript satisfies §10.9 outright. The AI relay, provider failover, Zod gate, fixtures and safety routing all carry over untouched, which is what made a rebuild affordable at all.
+- The brief's semantic colour roles mapped one-to-one onto the app's existing tone names, so the new dark palette needed **zero** component changes (D-017).
+
+**What did not work:**
+
+- The companion spec's §17 contracts conflict with the shipped ones. Resolved by extension rather than replacement (D-016) — a wholesale rename would have cost 96 passing checks for no behavioural gain.
+
+**Verification/evidence:**
+
+- `npx tsc --noEmit` → 0 errors after each foundation file.
+- `npx eslint src/features src/situation src/types/practice.ts` → 0 findings.
+
+**Files materially changed:**
+
+- `src/situation/{types,reducer}.ts`, `src/features/registry.ts`, `src/types/practice.ts`, `src/styles/themes.css`, `src/styles/applyTheme.ts`
+
+**Decisions created:**
+
+- D-016, D-017, D-018
+
+**Next step:**
+
+- Wave 2: Communicate, Understand, Repair and Patterns workspaces. Then Presentation Mode, Under the Hood, the three prepared scenarios, and a consolidated verification pass including a contrast audit of the `console` theme.
+
 ### Milestone Entry Template
 
 **Time:**  
@@ -422,6 +461,9 @@ Record meaningful product, scope, architecture, AI, design, and safety decisions
 | D-004 | 11:44 / Phase 1 | Make the Say It Better **Zod schema stricter than the spec §17 type**: when `needsFollowUp` is `false`, `sendableMessage` is required; when `true`, at least one question is required. | Accept the spec's shape as written and guard in the UI instead. | Every result field is optional in §17, so `{mode, needsFollowUp: false, followUpQuestions: []}` type-checks, validates, and renders an empty result screen — the validation gate would be letting through exactly the failure it exists to catch. Guarding in the UI would mean repeating the check in every consumer. | The runtime schema and the compile-time type deliberately disagree. Documented in the schema file so the next reader isn't confused. | No — this is the correct behavior. |
 | D-005 | 11:44 / Phase 1 | Require exactly 2 `participants` in the Conflict Lens schema and join them to speaker names on `speakerId`. | Allow N participants now. | `ConflictLensResponse.participants` carries only a `speakerId` — no name, no role — so the UI must join against the request's `speakers[]`. Enforcing the count and the join at the gate turns a silently-blank two-column layout into a caught validation error. Multi-speaker is P1. | Multi-speaker conflicts are rejected rather than partially rendered. Correct for this build. | Yes, when multi-speaker support is built. |
 | D-006 | 11:45 / Phase 1 | Parallelize the build across managed subagents with **disjoint file ownership** and a frozen primitive API contract, rather than building strictly serially. | Serial build in one context. | A 4.5-hour budget across five phases doesn't fit serially. Contracts, schemas, and design tokens were written centrally *first*, so agents could not diverge on shared shapes; each agent got an explicit file allowlist. | Contract-drift risk if an agent silently changes a signature — mitigated by instructing agents to flag mismatches rather than change them, and by a typecheck gate at every merge point. | n/a — build-process decision. |
+| D-016 | 17:55 / UI rebuild | **Extend the existing data contracts with the Adult Communication spec's §17 information rather than replacing them.** Added `Confidence` (incl. `cannot_determine`), `EvidenceItem`, `SafetyState`, `ExerciseRecommendation`, `MeaningPreservation`, `CommunicationTest`, `IntentImpactPair` in `src/types/practice.ts`. | (a) Replace the contracts wholesale to match §17's identifiers exactly. (b) Run two parallel contract sets. (c) Adapter layer translating at every boundary. | §17 renames fields the app already carries under other names (`primaryMessage`/`sendableMessage`, `speakers`/`participants`) but says the implementation "may use TypeScript and Zod **or an equivalent validator**" — so the binding part is the *information*, not the identifiers. A wholesale rename would invalidate 8 fixtures, 6 schemas, 4 prompts, 3 result views and **96 passing checks** for no behavioural gain, at significant cost to a constrained usage budget. | Two naming conventions coexist for the same concepts, documented at the top of `practice.ts`. Anyone diffing the app against §17 will see identifier drift and must read that comment to know it is deliberate. | **Yes** — worth unifying if the product continues past the hackathon. |
+| D-017 | 17:58 / UI rebuild | Add the brief's dark palette as a ninth theme (`console`) and make it the **default**, rather than replacing the theming system. | (a) Replace all themes with the single dark palette the brief specifies. (b) Hardcode the dark palette and drop theming. | The brief §5.2 mandates a specific dark palette, but the app already has a working nine-theme runtime system where every colour, radius, shadow and typeface is swappable. Expressing the brief's palette *as a theme* satisfies it exactly while keeping that infrastructure. The brief's semantic roles also map cleanly onto the existing ones — `fact`→teal, `assumption`→amber, `unknown`→slate, `failure`→coral, `warm`→accent — so no component needed changing. | The eight light themes remain reachable in Settings and are no longer the primary design. `console` has **not** been contrast-audited yet — flagged `contrastAudited: false` and audited before completion. | No. |
+| D-018 | 18:00 / UI rebuild | Skip React Router and Framer Motion despite both being suggested (brief §18, §20). | Add both, as suggested. | §18 calls routes "suggested" and itself prefers overlays for Context Switch and Breakpoint; state-driven navigation with a URL hash keeps browser-back working without a routing dependency that could complicate the demo. The existing CSS motion system already does staged reveals, spring easing and reduced-motion. §20 says not to add a large dependency for one decorative effect. | No deep-linking to a tool by URL path. If sharing a specific tool's URL becomes a requirement, this needs revisiting. | Yes, if deep links are wanted. |
 | D-015 | 16:50 / Phase 5 | **Multi-provider relay with automatic failover.** `AI_PROVIDER` names a primary and `AI_FALLBACK_PROVIDERS` an ordered chain across `anthropic`, `openai`, and any OpenAI-compatible endpoint. The relay moves to the next provider on a provider-side failure and reports which one actually served the result. | (a) Stay single-provider and rely on the fixture fallback. (b) Let the user switch provider manually in Settings. (c) Call several providers in parallel and take the first answer. | Requested after Anthropic became unusable mid-build (empty credit balance) — a single provider is a single point of failure for the live demo. Spec §16 already anticipated this with `AI_PROVIDER=anthropic\|openai\|compatible`. Sequential-with-failover beats parallel: parallel would multiply cost and make "which provider answered" nondeterministic. | The relay is no longer a thin pass-through — it owns a provider chain, two request shapes, and a self-healing retry for OpenAI's `max_tokens` → `max_completion_tokens` change and for gateways that reject `response_format`. **The browser bring-your-own-key path stays Anthropic-only on purpose**: adding a second provider there would mean asking the user to paste a second key into the browser, which is the opposite of the direction this build has taken. Failover is a server-route capability only. | No. |
 | D-014 | 14:50 / Phase 5 | **Pin the visual-style decision and make style a swappable layer.** All colour, type, radius, border width, shadow, and gradient values moved out of `tailwind.config.ts` into CSS custom properties in `src/styles/themes.css`; Tailwind now maps names onto variables. Eight themes ship (Editorial, Signal, Field Notes, Loud, Swiss, Blueprint, Dusk, Sunrise) with a runtime picker in Settings; four are contrast-audited and the rest are labelled Draft. | (a) Keep hardcoding the built style and re-skin later by editing components. (b) Maintain four separate Tailwind configs. (c) Present static mockups only and decide later on paper. | The owner wanted the style decision deferred until the product is finished, without that deferral becoming expensive. Centralising the values means the later choice costs a token edit rather than a component sweep — and it can be judged in the real app on real content instead of from a mockup. | **Colours must be stored as `R G B` triplets, not hex**, because Tailwind wraps them as `rgb(var(--token) / <alpha-value>)` to keep ~165 existing opacity modifiers working; a hex value there breaks all of them silently. Theme switching is now a runtime change, so nothing but variable *names* is baked in at build time. Cost: one extra indirection when reading the CSS. Editorial, Swiss, Blueprint and Sunrise are contrast-audited (0 failures each, three screens); Signal, Field Notes, Loud and Dusk are labelled **Draft** in the UI rather than presented as finished. | No — this is the right structure regardless of which style wins. |
 | D-012 | 13:20 / Phase 5 | Rebuild the visual foundation around an **editorial display serif (Fraunces) paired with Inter and JetBrains Mono**, on a warm textured ground with layered depth, gradient feature surfaces, and chartreuse reserved as a sparing delight accent. | (a) Incrementally tune the existing flat SaaS look. (b) Adopt a darker, more technical "Human Protocol" direction (spec §12 Option C). | The build already satisfied spec §12's Option A palette but read as generic because everything was one typeface at one weight on flat white cards. A display serif against a crisp UI sans is what makes an interface read as *designed* rather than defaulted, and it costs nothing at runtime beyond one webfont. Option C was rejected as gimmick-prone per the spec's own warning. | One additional Google font (~2 files, `display=swap`, real fallback stack). Fraunces' variation axes are set in one CSS class, so the personality is tunable from a single place. | No. |

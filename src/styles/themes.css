@@ -722,3 +722,82 @@
   --cs-display-weight: 800;
   --cs-grain-opacity: 0;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   CONSOLE  (default — the Human Observability Console from the UI brief §5.2)
+   Palette values are the brief's exact tokens, mapped onto this app's semantic
+   names. The mapping is deliberate, not arbitrary:
+     brief `fact`       -> teal   (already means confirmed/known here)
+     brief `assumption` -> amber  (already means plausible/caution)
+     brief `unknown`    -> slate  (already means speculative/unknown)
+     brief `failure`    -> coral  (already means conflict/escalation)
+     brief `warm`       -> accent (the sparing human-warmth colour)
+   So the brief's semantic intent lands on the roles the components already use,
+   with no component changes required.
+   ───────────────────────────────────────────────────────────────────────────── */
+:root[data-theme='console'] {
+  --cs-paper: 9 13 20;              /* canvas    #090D14 */
+  --cs-paper-sunk: 15 22 34;        /* surface-1 #0F1622 */
+  --cs-surface: 21 30 44;           /* surface-2 #151E2C */
+  --cs-surface-ink: 6 9 14;
+
+  --cs-ink: 242 245 248;            /* text-primary   #F2F5F8 */
+  --cs-ink-muted: 170 182 197;      /* text-secondary #AAB6C5 */
+
+  --cs-line: 38 52 72;              /* border    #263448 */
+  --cs-line-strong: 27 38 54;       /* surface-3 #1B2636 */
+
+  --cs-primary: 77 163 255;         /* primary   #4DA3FF */
+  --cs-primary-hover: 122 189 255;
+  --cs-primary-soft: 16 32 54;
+  --cs-primary-ring: 77 163 255;
+
+  --cs-secondary: 155 143 232;      /* unknown   #9B8FE8 */
+  --cs-secondary-soft: 27 26 56;
+
+  --cs-accent: 213 155 114;         /* warm      #D59B72 */
+  --cs-accent-soft: 44 31 21;
+  --cs-accent-ink: 233 187 155;
+
+  --cs-teal: 86 197 150;            /* fact      #56C596 */
+  --cs-teal-soft: 11 40 30;
+  --cs-teal-ink: 126 219 178;
+  --cs-amber: 240 180 90;           /* assumption #F0B45A */
+  --cs-amber-soft: 45 32 12;
+  --cs-amber-ink: 244 199 132;
+  --cs-slate: 155 143 232;          /* unknown   #9B8FE8 */
+  --cs-slate-soft: 25 27 44;
+  --cs-slate-ink: 186 178 240;
+  --cs-coral: 232 114 114;          /* failure   #E87272 */
+  --cs-coral-soft: 48 20 20;
+  --cs-coral-ink: 242 158 158;
+
+  --cs-radius-card: 14px;           /* brief §5.4: 12-18px */
+  --cs-radius-card-lg: 18px;
+  --cs-border-w: 1px;
+
+  /* Thin keylines rather than heavy shadows (brief §5.4). */
+  --cs-shadow-card: 0 0 0 1px rgb(38 52 72 / 0.6), 0 6px 20px -12px rgb(0 0 0 / 0.8);
+  --cs-shadow-lift: 0 0 0 1px rgb(38 52 72 / 0.8), 0 14px 34px -16px rgb(0 0 0 / 0.85);
+  --cs-shadow-float: 0 0 0 1px rgb(77 163 255 / 0.18), 0 22px 52px -20px rgb(0 0 0 / 0.9);
+  --cs-shadow-glow-primary: 0 0 0 1px rgb(77 163 255 / 0.35), 0 0 28px -10px rgb(77 163 255 / 0.5);
+  --cs-shadow-glow-accent: 0 0 0 1px rgb(213 155 114 / 0.35), 0 0 26px -10px rgb(213 155 114 / 0.45);
+  --cs-shadow-inner-top: inset 0 1px 0 rgb(255 255 255 / 0.05);
+
+  --cs-grad-primary: linear-gradient(135deg, #2f7fd6 0%, #4da3ff 60%, #6f8df0 100%);
+  --cs-grad-accent: linear-gradient(135deg, #d59b72 0%, #c98a5f 100%);
+  --cs-grad-ink: linear-gradient(150deg, #16202f 0%, #0f1622 60%, #090d14 100%);
+  --cs-grad-coral: linear-gradient(135deg, #e88a8a 0%, #e87272 100%);
+  --cs-grad-teal: linear-gradient(135deg, #6fd3a8 0%, #56c596 100%);
+  --cs-wash-hero: radial-gradient(120% 90% at 8% -10%, rgb(77 163 255 / 0.16) 0%, rgb(77 163 255 / 0) 55%),
+    radial-gradient(100% 80% at 95% 0%, rgb(155 143 232 / 0.13) 0%, rgb(155 143 232 / 0) 60%);
+  --cs-wash-panel: linear-gradient(160deg, rgb(27 38 54 / 0.85) 0%, rgb(21 30 44 / 0.95) 100%);
+  --cs-sheen: linear-gradient(90deg, rgb(77 163 255 / 0) 0%, rgb(77 163 255 / 0.35) 50%, rgb(77 163 255 / 0) 100%);
+
+  --cs-font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --cs-font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --cs-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --cs-display-vf: normal;
+  --cs-display-weight: 600;
+  --cs-grain-opacity: 0;
+}

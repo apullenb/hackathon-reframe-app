@@ -9,6 +9,7 @@
  */
 
 export type ThemeId =
+  | 'console'
   | 'editorial'
   | 'fieldnotes'
   | 'swiss'
@@ -34,6 +35,17 @@ export type ThemeDefinition = {
 };
 
 export const THEMES: readonly ThemeDefinition[] = [
+  {
+    id: 'console',
+    label: 'Console',
+    description: 'Human Observability Console. Dark, precise, evidence-first.',
+    fontFamilies: [
+      'Space+Grotesk:wght@400..700',
+      'Inter:wght@400..800',
+      'JetBrains+Mono:wght@400..700',
+    ],
+    contrastAudited: false,
+  },
   {
     id: 'editorial',
     label: 'Editorial',
@@ -100,7 +112,7 @@ export const THEMES: readonly ThemeDefinition[] = [
   },
 ] as const;
 
-export const DEFAULT_THEME: ThemeId = 'editorial';
+export const DEFAULT_THEME: ThemeId = 'console';
 
 const STORAGE_KEY = 'context-switch:theme';
 const FONT_LINK_ID = 'cs-theme-fonts';
