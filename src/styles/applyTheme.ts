@@ -44,7 +44,7 @@ export const THEMES: readonly ThemeDefinition[] = [
       'Inter:wght@400..800',
       'JetBrains+Mono:wght@400..700',
     ],
-    contrastAudited: false,
+    contrastAudited: true,
   },
   {
     id: 'editorial',

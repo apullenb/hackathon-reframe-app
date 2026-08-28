@@ -7,6 +7,9 @@ import { ConsoleShell } from '@/components/shell';
 import { HomeScreen, CommandPalette, ContextSwitchOverlay } from '@/components/home';
 import type { PaletteCommand, ScenarioSummary } from '@/components/home';
 import { StateInspector, ThoughtDebugger, StackTrace, BreakpointOverlay } from '@/components/inspect';
+import { UnitTestRunner } from '@/components/communicate';
+import { Patch } from '@/components/repair';
+import { HealthCheck, Postmortem } from '@/components/patterns';
 import { AiModeIndicator } from '@/components/AiModeIndicator';
 import { AiSettingsDrawer } from '@/components/AiSettingsDrawer';
 import { SayItBetterResult } from '@/components/sayItBetter';
@@ -65,8 +68,12 @@ export function App() {
   /* ── Global shortcuts: ⌘K palette, and the presentation scenario keys (brief §10.7) ── */
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      const typing = target?.matches('input, textarea, select, [contenteditable="true"]');
+      // `event.target` is not always an Element — a keydown with focus on the document targets
+      // `window`, which has no `matches`, and calling it would throw and kill every shortcut.
+      const target = event.target;
+      const typing =
+        target instanceof Element &&
+        target.matches('input, textarea, select, [contenteditable="true"]');
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setPaletteOpen((open) => !open);
@@ -298,6 +305,14 @@ function ToolSurface(props: ToolSurfaceProps) {
       return <ThoughtDebugger situation={situation} dispatch={dispatch} />;
     case 'stack_trace':
       return <StackTrace situation={situation} dispatch={dispatch} onOpenTool={openTool} />;
+    case 'unit_tests':
+      return <UnitTestRunner situation={situation} dispatch={dispatch} onOpenTool={openTool} />;
+    case 'patch':
+      return <Patch situation={situation} dispatch={dispatch} onOpenTool={openTool} />;
+    case 'health_check':
+      return <HealthCheck situation={situation} dispatch={dispatch} onOpenTool={openTool} />;
+    case 'postmortem':
+      return <Postmortem situation={situation} dispatch={dispatch} onOpenTool={openTool} />;
     default:
       break;
   }

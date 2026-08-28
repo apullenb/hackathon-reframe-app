@@ -784,7 +784,10 @@
   --cs-shadow-glow-accent: 0 0 0 1px rgb(213 155 114 / 0.35), 0 0 26px -10px rgb(213 155 114 / 0.45);
   --cs-shadow-inner-top: inset 0 1px 0 rgb(255 255 255 / 0.05);
 
-  --cs-grad-primary: linear-gradient(135deg, #2f7fd6 0%, #4da3ff 60%, #6f8df0 100%);
+  /* Components place `text-surface` on this gradient, and in a dark theme `surface` is dark.
+     The old #2f7fd6 first stop put that dark text at 4.09:1, under the 4.5 floor. Every
+     stop here now clears 5.3:1 against `--cs-surface`. */
+  --cs-grad-primary: linear-gradient(135deg, #4a9bf5 0%, #4da3ff 60%, #6f8df0 100%);
   --cs-grad-accent: linear-gradient(135deg, #d59b72 0%, #c98a5f 100%);
   --cs-grad-ink: linear-gradient(150deg, #16202f 0%, #0f1622 60%, #090d14 100%);
   --cs-grad-coral: linear-gradient(135deg, #e88a8a 0%, #e87272 100%);

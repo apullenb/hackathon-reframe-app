@@ -748,7 +748,7 @@ export function UnitTestRunner({
         </Card>
 
         <div className="flex flex-col gap-5">
-          <Card tone={selected?.evidence ? 'amber' : 'default'}>
+          <Card className={cn(selected?.evidence && 'border-amber/40')}>
             <CardHeader
               eyebrow="draft.under_test"
               title="The draft"
