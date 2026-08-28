@@ -193,7 +193,7 @@ function RouteNode({
 
       <span className="min-w-0">
         {size === 'lg' ? (
-          <span className="block font-mono text-sm uppercase leading-tight tracking-[0.16em] text-ink-muted">
+          <span className="block font-mono text-xs uppercase leading-tight tracking-[0.08em] text-ink-muted">
             {tone === 'from' ? 'Sender' : 'Recipient'}
           </span>
         ) : null}

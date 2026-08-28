@@ -53,9 +53,10 @@ export function ContextBuilder({
 
       <RoleRoute from={route.from} to={route.to} active={routeActive} />
 
-      {/* Two-up only when the column is actually wide: App splits the workspace at `lg`, so a
-          plain md:grid-cols-2 would squeeze these into ~270px there. */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
+      {/* One per row until there is genuinely room for two. These cards hold a select plus four
+          role chips; below roughly 520px of column width the chips drop to one per line and the
+          whole card reads as a stack of skinny boxes. */}
+      <div className="grid gap-4 [@media(min-width:1500px)]:grid-cols-2">
         <RoleSelector
           label={labels.self}
           hint={labels.selfHint}

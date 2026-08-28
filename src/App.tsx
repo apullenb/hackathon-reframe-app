@@ -89,6 +89,7 @@ export function App() {
   const [provider, setProvider] = useState<string | null>(null);
 
   const rolesChosen = Boolean(context.selfRole && context.otherRole);
+  const [editingPeople, setEditingPeople] = useState(false);
 
   const canRun = Boolean(
     context.selfRole && context.otherRole && context.relationship && context.channel && text.trim(),
@@ -279,7 +280,18 @@ export function App() {
 
         {tab === 'repair' ? (
           <div className="space-y-6">
-            <ConflictPeoplePicker context={context} onChange={(patch) => setContext((prev) => ({ ...prev, ...patch }))} />
+            <ConflictPeoplePicker
+              context={context}
+              onChange={(patch) => {
+                setContext((prev) => {
+                  const next = { ...prev, ...patch };
+                  if (next.selfRole && next.otherRole) setEditingPeople(false);
+                  return next;
+                });
+              }}
+              collapsed={rolesChosen && !editingPeople}
+              onExpand={() => setEditingPeople(true)}
+            />
             {rolesChosen ? (
               <RepairView
                 otherPerson={context.otherRole ?? 'the other person'}
@@ -335,10 +347,35 @@ export function App() {
 function ConflictPeoplePicker({
   context,
   onChange,
+  collapsed,
+  onExpand,
 }: {
   context: Partial<CommunicationContext>;
   onChange: (patch: Partial<CommunicationContext>) => void;
+  collapsed: boolean;
+  onExpand: () => void;
 }) {
+  // Once both roles are chosen this collapses to one line. Left expanded, the two role cards
+  // fill the viewport and push the actual work below the fold, which reads as "nothing happened".
+  if (collapsed) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface px-4 py-3">
+        <p className="text-sm font-medium text-ink">
+          <span className="text-ink-muted">Between </span>
+          <span className="font-bold">{context.selfRole}</span>
+          <span className="text-ink-muted"> and </span>
+          <span className="font-bold">{context.otherRole}</span>
+          {context.relationship ? (
+            <span className="text-ink-muted"> · {context.relationship}</span>
+          ) : null}
+        </p>
+        <Button variant="ghost" size="sm" onClick={onExpand}>
+          Change
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <section aria-labelledby="people-heading" className="space-y-4">
       <div>
