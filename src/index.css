@@ -107,6 +107,19 @@
       var(--cs-shadow-inner-top),
       var(--tw-shadow, 0 0 #0000);
   }
+
+  /**
+   * The REFRAME mark is a raster wordmark in a single flat dark-green ink, so it vanishes on a
+   * dark ground. Themes are switched only by `data-theme` on <html> (src/styles/applyTheme.ts) —
+   * there is no `prefers-color-scheme` path in this app — so dark themes are named explicitly
+   * here. Add a theme to this selector list if its `--cs-paper` is dark.
+   *
+   * `brightness(0)` flattens the ink to pure black and `invert(1)` lifts it to pure white; the
+   * alpha channel is untouched, so the transparent margin stays transparent.
+   */
+  :root[data-theme='console'] .brand-mark {
+    filter: brightness(0) invert(1);
+  }
 }
 
 @layer utilities {

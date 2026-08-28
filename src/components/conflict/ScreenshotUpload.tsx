@@ -365,7 +365,7 @@ export function ScreenshotUpload({
         {/* Spec §19 step 8 / §20 — accurate, restrained, and it does not claim on-device OCR. */}
         <p className="text-sm leading-relaxed text-ink-muted">
           Reading a screenshot uploads it to the configured AI provider — there is no on-device
-          text recognition here. Context Switch discards the image after the request and never
+          text recognition here. Reframe discards the image after the request and never
           writes it to browser storage, so avoid uploading anything you would not want processed
           by that provider.
         </p>

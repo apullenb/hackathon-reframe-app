@@ -21,7 +21,7 @@ const styles: Record<Exclude<SafetyCategory, 'none'>, NoticeStyle> = {
     icon: Scale,
     heading: 'High-stakes professional message',
     fallbackMessage:
-      'This situation may carry formal consequences. Context Switch can help organize your wording, but it cannot tell you your rights or your employer’s policies.',
+      'This situation may carry formal consequences. Reframe can help organize your wording, but it cannot tell you your rights or your employer’s policies.',
   },
   threat_or_intimidation: {
     tone: 'coral',
@@ -47,9 +47,9 @@ const styles: Record<Exclude<SafetyCategory, 'none'>, NoticeStyle> = {
   illegal_or_deceptive_request: {
     tone: 'coral',
     icon: AlertTriangle,
-    heading: 'Context Switch cannot help with this',
+    heading: 'Reframe cannot help with this',
     fallbackMessage:
-      'This request appears to involve deception or illegal activity, which is outside what Context Switch will help write.',
+      'This request appears to involve deception or illegal activity, which is outside what Reframe will help write.',
   },
 };
 

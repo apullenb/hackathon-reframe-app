@@ -12,6 +12,14 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), aiProxyPlugin()],
+    // Honor the PORT the harness assigns (autoPort in .claude/launch.json). Vite does not read
+    // PORT on its own, so without this the launcher and the server would disagree about the
+    // port. strictPort stays false so a busy port steps to the next free one instead of dying —
+    // the AI route is a relative path, so nothing is pinned to a specific port.
+    server: {
+      port: Number(process.env.PORT) || 5173,
+      strictPort: false,
+    },
     resolve: {
       alias: { '@': path.resolve(__dirname, 'src') },
     },

@@ -103,7 +103,7 @@ export function FlagshipScenarioHint({ onLoad }: { onLoad: () => void }) {
     <button
       type="button"
       onClick={onLoad}
-      className="group inline-flex min-h-tap items-center gap-2.5 rounded-chip bg-ink px-5 py-3 text-[0.95rem] font-bold text-paper shadow-lift transition-all duration-300 ease-spring hover:-translate-y-0.5 hover:shadow-float"
+      className="group inline-flex min-h-tap items-center gap-2.5 rounded-chip bg-ink px-5 py-3 text-[1.2rem] font-bold text-paper shadow-lift transition-all duration-300 ease-spring hover:-translate-y-0.5 hover:shadow-float"
     >
       <Sparkles
         className="h-[18px] w-[18px] text-accent transition-transform duration-300 ease-spring motion-safe:group-hover:rotate-12"

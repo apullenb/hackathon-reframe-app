@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, PenLine } from 'lucide-react';
+import { ArrowLeft, Layers, PenLine } from 'lucide-react';
 import { Button, Card, CardBody, Textarea } from '@/components/ui';
 import { cn } from '@/lib/cn';
+import { FactOrGuessDeck } from './FactOrGuessDeck';
 import { InsightCard } from './InsightCard';
 import type { FeelingChip } from './InsightCard';
 import {
@@ -68,6 +69,8 @@ export function InspectFlow({ otherPerson, onTakeToTranslator }: InspectFlowProp
   const [rejected, setRejected] = useState<readonly string[]>([]);
   /** Words the user added on the insight card, in their own wording. */
   const [added, setAdded] = useState<readonly string[]>([]);
+  /** The fact-or-guess practice deck, which sits beside this flow rather than inside it. */
+  const [practising, setPractising] = useState(false);
 
   const headingRef = useRef<HTMLHeadingElement>(null);
   const hasMovedRef = useRef(false);
@@ -174,6 +177,13 @@ export function InspectFlow({ otherPerson, onTakeToTranslator }: InspectFlowProp
     setAdded((previous) => (previous.includes(word) ? previous : [...previous, word]));
     setRejected((previous) => previous.filter((w) => w !== word));
   }, []);
+
+  // ── Practice deck ──────────────────────────────────────────────────────────
+  // A detour, not a step: the trail and the current question are untouched while it is open, so
+  // coming back lands exactly where the user left off.
+  if (practising) {
+    return <FactOrGuessDeck onExit={() => setPractising(false)} />;
+  }
 
   // ── Outcome ────────────────────────────────────────────────────────────────
   if (isOutcome(node)) {
@@ -324,9 +334,14 @@ export function InspectFlow({ otherPerson, onTakeToTranslator }: InspectFlowProp
         </CardBody>
       </Card>
 
-      <p className="text-sm leading-relaxed text-ink-muted">
-        Nothing here leaves your device. This is reflection, not therapy or advice.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Button variant="ghost" size="md" leadingIcon={Layers} onClick={() => setPractising(true)}>
+          Practise: fact or guess?
+        </Button>
+        <p className="text-sm leading-relaxed text-ink-muted">
+          Nothing here leaves your device. This is reflection, not therapy or advice.
+        </p>
+      </div>
     </section>
   );
 }

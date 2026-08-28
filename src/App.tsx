@@ -10,9 +10,10 @@ import type {
 } from '@/types/contracts';
 import { CommunicateView } from '@/components/communicate2';
 import { RepairView } from '@/components/repair2';
-import { InspectFlow } from '@/components/inspect2';
+import { InspectFlow, ScottCounter } from '@/components/inspect2';
 import { AiModeIndicator } from '@/components/AiModeIndicator';
 import { AiSettingsDrawer } from '@/components/AiSettingsDrawer';
+import { BrandHeader } from '@/components/BrandHeader';
 import { Button, Select } from '@/components/ui';
 import { RoleSelector } from '@/components/context/RoleSelector';
 import { RELATIONSHIPS } from '@/data/vocabulary';
@@ -58,7 +59,7 @@ const TABS: ReadonlyArray<{
   {
     id: 'inspect',
     label: 'Inspect',
-    blurb: 'Questions to help you work out how you feel.',
+    blurb: 'Debug your feelings.',
     icon: Compass,
   },
 ];
@@ -194,15 +195,21 @@ export function App() {
       <header className="border-b border-line bg-paper/90 backdrop-blur">
         <div className="mx-auto w-full max-w-5xl px-4 py-4 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="font-display text-xl font-semibold tracking-tight text-ink">
-                Context Switch
-              </p>
+            <div className="min-w-0">
+              {/*
+                `compact` because this header supplies its own tagline below; BrandHeader's
+                non-compact tagline ("Translate intent into impact.") would sit next to this one
+                and read as two competing straplines.
+              */}
+              <BrandHeader compact />
               <p className="text-sm font-medium text-ink-muted">
-                Help saying the hard thing, and understanding what someone meant.
+                Troubleshoot communication and debug relationships.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            {/* flex-wrap: without it this row is 393px intrinsic inside a 358px box at 390px
+                wide, so "Start over" overflowed and was silently clipped by the root's
+                overflow-x-clip — the control was unreachable on a phone. */}
+            <div className="flex flex-wrap items-center gap-2">
               <AiModeIndicator
                 activeSource={source}
                 activeProvider={provider}
@@ -318,16 +325,19 @@ export function App() {
         ) : null}
 
         {tab === 'inspect' ? (
-          <InspectFlow
-            otherPerson={context.otherRole ?? 'the other person'}
-            onTakeToTranslator={(draft) => {
-              setMode('say_it_better');
-              setText(draft);
-              setResult(null);
-              setError(null);
-              setTab('communicate');
-            }}
-          />
+          <>
+            <InspectFlow
+              otherPerson={context.otherRole ?? 'the other person'}
+              onTakeToTranslator={(draft) => {
+                setMode('say_it_better');
+                setText(draft);
+                setResult(null);
+                setError(null);
+                setTab('communicate');
+              }}
+            />
+            <ScottCounter />
+          </>
         ) : null}
       </main>
 

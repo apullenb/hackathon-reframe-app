@@ -70,12 +70,34 @@ export default {
         sans: ['var(--cs-font-sans)'],
         mono: ['var(--cs-font-mono)'],
       },
+      /**
+       * Every step is Tailwind's default plus 4px, and every display step likewise (two
+       * successive +2px passes).
+       *
+       * Kept in `rem` (2px = 0.125rem at the 16px root) rather than px on purpose: Presentation
+       * Mode raises the root to 18px to fill a projector, and a px-based scale would silently
+       * stop responding to it. Line heights get the same +0.125rem so the vertical rhythm holds
+       * — bumping size alone would leave every block measurably tighter than it was designed.
+       */
       fontSize: {
+        xs: ['1rem', { lineHeight: '1.25rem' }],
+        sm: ['1.125rem', { lineHeight: '1.5rem' }],
+        base: ['1.25rem', { lineHeight: '1.75rem' }],
+        lg: ['1.375rem', { lineHeight: '2rem' }],
+        xl: ['1.5rem', { lineHeight: '2rem' }],
+        '2xl': ['1.75rem', { lineHeight: '2.25rem' }],
+        '3xl': ['2.125rem', { lineHeight: '2.5rem' }],
+        '4xl': ['2.5rem', { lineHeight: '2.75rem' }],
+        '5xl': ['3.25rem', { lineHeight: '1' }],
+        '6xl': ['4rem', { lineHeight: '1' }],
+        '7xl': ['4.75rem', { lineHeight: '1' }],
+        '8xl': ['6.25rem', { lineHeight: '1' }],
+        '9xl': ['8.25rem', { lineHeight: '1' }],
         // Display scale, tuned for a large optical size.
-        'display-sm': ['1.75rem', { lineHeight: '1.12', letterSpacing: '-0.021em' }],
-        'display-md': ['2.375rem', { lineHeight: '1.06', letterSpacing: '-0.024em' }],
-        'display-lg': ['3.25rem', { lineHeight: '1.02', letterSpacing: '-0.028em' }],
-        'display-xl': ['4.25rem', { lineHeight: '0.98', letterSpacing: '-0.032em' }],
+        'display-sm': ['2rem', { lineHeight: '1.12', letterSpacing: '-0.021em' }],
+        'display-md': ['2.625rem', { lineHeight: '1.06', letterSpacing: '-0.024em' }],
+        'display-lg': ['3.5rem', { lineHeight: '1.02', letterSpacing: '-0.028em' }],
+        'display-xl': ['4.5rem', { lineHeight: '0.98', letterSpacing: '-0.032em' }],
       },
       borderRadius: {
         card: 'var(--cs-radius-card)',
