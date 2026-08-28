@@ -1,0 +1,724 @@
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ *  CONTEXT SWITCH — VISUAL THEMES
+ *  This file is the ONLY place visual style is defined. To change how the whole
+ *  app looks, edit a block here or switch the active theme. No component needs
+ *  to change.
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * HOW IT WORKS
+ *   Every colour is stored as a bare "R G B" triplet, not a hex string, because
+ *   tailwind.config.ts wraps each one as `rgb(var(--token) / <alpha-value>)`.
+ *   That is what keeps the ~165 existing opacity modifiers in the codebase
+ *   (`border-primary/25`, `bg-surface/70`, …) working. If you write a hex value
+ *   here, every one of those silently breaks.
+ *
+ * HOW TO ADD A THEME
+ *   1. Copy a whole block below and change the `[data-theme="…"]` selector.
+ *   2. Fill in every token — none are optional; a missing one falls back to the
+ *      previous theme's value and produces a confusing half-styled page.
+ *   3. Register it in src/styles/applyTheme.ts so it appears in Settings and so
+ *      its webfonts get loaded.
+ *
+ * WHAT EACH GROUP DOES
+ *   ground/surface  page and card backgrounds
+ *   ink             text. `--cs-ink-muted` must stay >= 4.5:1 on the ground.
+ *   line            hairlines and borders
+ *   primary         primary actions and the role route
+ *   secondary       secondary emphasis
+ *   accent          the sparing delight colour. NEVER used for body text.
+ *   teal            known facts / success / positive
+ *   amber           "plausible" support level / caution
+ *   slate           "speculative" support level / unknowns / neutral
+ *   coral           conflict and escalation markers
+ *
+ * ACCESSIBILITY NOTE
+ *   All eight themes have been contrast-audited in the running app, measured from rendered
+ *   colours (gradient grounds and gradient-filled text handled correctly), on three screens
+ *   each: the Conflict Lens composer, a Say It Better result, and a Decode result.
+ *   Result: 0 failures per theme per screen. Re-run the audit after changing any token —
+ *   `--cs-slate` in particular is paired with white text by components, so it must stay dark
+ *   enough for that (fieldnotes originally measured 4.36:1 there and had to be darkened).
+ */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   A · EDITORIAL  (default — warm paper, display serif, indigo → violet)
+   ───────────────────────────────────────────────────────────────────────────── */
+:root,
+:root[data-theme='editorial'] {
+  /* ground + surface */
+  --cs-paper: 250 247 242;
+  --cs-paper-sunk: 242 236 225;
+  --cs-surface: 255 255 255;
+  --cs-surface-ink: 20 22 54;
+
+  /* text */
+  --cs-ink: 19 22 53;
+  --cs-ink-muted: 83 90 124;
+
+  /* lines */
+  --cs-line: 232 226 214;
+  --cs-line-strong: 206 198 181;
+
+  /* primary */
+  --cs-primary: 65 55 198;
+  --cs-primary-hover: 52 44 164;
+  --cs-primary-soft: 238 236 253;
+  --cs-primary-ring: 123 114 240;
+
+  /* secondary */
+  --cs-secondary: 138 60 243;
+  --cs-secondary-soft: 244 235 255;
+
+  /* accent — backdrop only, never text */
+  --cs-accent: 203 255 61;
+  --cs-accent-soft: 242 255 212;
+  --cs-accent-ink: 61 90 6;
+
+  /* semantic */
+  --cs-teal: 15 166 151;
+  --cs-teal-soft: 224 247 244;
+  --cs-teal-ink: 10 107 96;
+  --cs-amber: 224 134 0;
+  --cs-amber-soft: 254 244 227;
+  --cs-amber-ink: 143 78 6;
+  --cs-slate: 106 118 145;
+  --cs-slate-soft: 241 244 249;
+  --cs-slate-ink: 60 71 92;
+  --cs-coral: 255 107 74;
+  --cs-coral-soft: 255 237 231;
+  --cs-coral-ink: 166 48 26;
+
+  /* shape */
+  --cs-radius-card: 18px;
+  --cs-radius-card-lg: 24px;
+  --cs-border-w: 1px;
+
+  /* depth */
+  --cs-shadow-card: 0 1px 2px rgb(19 22 53 / 0.04), 0 4px 12px -4px rgb(19 22 53 / 0.08),
+    0 12px 32px -16px rgb(19 22 53 / 0.14);
+  --cs-shadow-lift: 0 2px 4px rgb(19 22 53 / 0.05), 0 10px 24px -8px rgb(19 22 53 / 0.12),
+    0 28px 56px -24px rgb(19 22 53 / 0.24);
+  --cs-shadow-float: 0 4px 8px rgb(19 22 53 / 0.06), 0 20px 44px -12px rgb(19 22 53 / 0.18),
+    0 48px 88px -40px rgb(19 22 53 / 0.32);
+  --cs-shadow-glow-primary: 0 0 0 1px rgb(65 55 198 / 0.16), 0 2px 6px rgb(19 22 53 / 0.06),
+    0 18px 48px -16px rgb(123 114 240 / 0.55);
+  --cs-shadow-glow-accent: 0 0 0 1px rgb(203 255 61 / 0.5), 0 14px 40px -14px rgb(163 214 20 / 0.65);
+  --cs-shadow-inner-top: inset 0 1px 0 rgb(255 255 255 / 0.85);
+
+  /* feature surfaces */
+  --cs-grad-primary: linear-gradient(135deg, #4137c6 0%, #6b4be8 52%, #8a3cf3 100%);
+  --cs-grad-accent: linear-gradient(135deg, #cbff3d 0%, #a8f04b 100%);
+  --cs-grad-ink: linear-gradient(150deg, #1b1e45 0%, #131635 60%, #0e1029 100%);
+  --cs-grad-coral: linear-gradient(135deg, #ff8a5a 0%, #ff6b4a 100%);
+  --cs-grad-teal: linear-gradient(135deg, #2fc3b0 0%, #0fa697 100%);
+  --cs-wash-hero: radial-gradient(120% 90% at 8% -10%, rgb(138 60 243 / 0.14) 0%, rgb(138 60 243 / 0) 55%),
+    radial-gradient(100% 80% at 95% 0%, rgb(65 55 198 / 0.13) 0%, rgb(65 55 198 / 0) 60%),
+    radial-gradient(90% 70% at 60% 105%, rgb(203 255 61 / 0.2) 0%, rgb(203 255 61 / 0) 60%);
+  --cs-wash-panel: linear-gradient(160deg, rgb(255 255 255 / 0.96) 0%, rgb(250 247 242 / 0.92) 100%);
+  --cs-sheen: linear-gradient(90deg, rgb(255 255 255 / 0) 0%, rgb(255 255 255 / 0.9) 50%, rgb(255 255 255 / 0) 100%);
+
+  /* type */
+  --cs-font-display: 'Fraunces', ui-serif, Georgia, serif;
+  --cs-font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --cs-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  /* Variation axes for the display face. `normal` when the face has none. */
+  --cs-display-vf: 'SOFT' 40, 'WONK' 1, 'opsz' 42;
+  --cs-display-weight: 600;
+  --cs-grain-opacity: 0.035;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   B · FIELD NOTES  (analytical — one superfamily, navy on cool paper)
+   ───────────────────────────────────────────────────────────────────────────── */
+:root[data-theme='fieldnotes'] {
+  --cs-paper: 247 248 250;
+  --cs-paper-sunk: 239 242 246;
+  --cs-surface: 255 255 255;
+  --cs-surface-ink: 22 35 58;
+
+  --cs-ink: 22 35 58;
+  --cs-ink-muted: 90 107 133;
+
+  --cs-line: 216 224 234;
+  --cs-line-strong: 182 195 212;
+
+  --cs-primary: 30 58 110;
+  --cs-primary-hover: 22 43 82;
+  --cs-primary-soft: 231 237 246;
+  --cs-primary-ring: 78 118 184;
+
+  --cs-secondary: 42 93 168;
+  --cs-secondary-soft: 230 238 249;
+
+  --cs-accent: 201 123 18;
+  --cs-accent-soft: 251 241 224;
+  --cs-accent-ink: 138 82 9;
+
+  --cs-teal: 42 127 114;
+  --cs-teal-soft: 227 241 238;
+  --cs-teal-ink: 29 92 82;
+  --cs-amber: 201 123 18;
+  --cs-amber-soft: 251 241 224;
+  --cs-amber-ink: 138 82 9;
+  /* Darkened from 107 122 144: components pair `bg-slate` with white 14px text, which
+     measured 4.36:1 there — just under the 4.5:1 floor. 97 110 132 gives 5.15:1. */
+  --cs-slate: 97 110 132;
+  --cs-slate-soft: 237 240 245;
+  --cs-slate-ink: 65 78 99;
+  --cs-coral: 217 83 79;
+  --cs-coral-soft: 250 233 232;
+  --cs-coral-ink: 150 48 45;
+
+  --cs-radius-card: 5px;
+  --cs-radius-card-lg: 7px;
+  --cs-border-w: 1px;
+
+  --cs-shadow-card: 0 1px 2px rgb(22 35 58 / 0.06);
+  --cs-shadow-lift: 0 1px 2px rgb(22 35 58 / 0.07), 0 6px 16px -8px rgb(22 35 58 / 0.14);
+  --cs-shadow-float: 0 2px 4px rgb(22 35 58 / 0.08), 0 14px 32px -14px rgb(22 35 58 / 0.2);
+  --cs-shadow-glow-primary: 0 0 0 1px rgb(30 58 110 / 0.18), 0 4px 12px -6px rgb(22 35 58 / 0.2);
+  --cs-shadow-glow-accent: 0 0 0 1px rgb(201 123 18 / 0.3), 0 4px 12px -6px rgb(201 123 18 / 0.25);
+  --cs-shadow-inner-top: inset 0 1px 0 rgb(255 255 255 / 0.9);
+
+  --cs-grad-primary: linear-gradient(135deg, #1e3a6e 0%, #2a5da8 100%);
+  --cs-grad-accent: linear-gradient(135deg, #e0a33d 0%, #c97b12 100%);
+  --cs-grad-ink: linear-gradient(150deg, #22334f 0%, #16233a 100%);
+  --cs-grad-coral: linear-gradient(135deg, #e57b77 0%, #d9534f 100%);
+  --cs-grad-teal: linear-gradient(135deg, #3d9c8d 0%, #2a7f72 100%);
+  --cs-wash-hero: radial-gradient(120% 90% at 8% -10%, rgb(30 58 110 / 0.08) 0%, rgb(30 58 110 / 0) 55%),
+    radial-gradient(100% 80% at 95% 0%, rgb(42 93 168 / 0.07) 0%, rgb(42 93 168 / 0) 60%);
+  --cs-wash-panel: linear-gradient(160deg, rgb(255 255 255 / 1) 0%, rgb(250 251 253 / 1) 100%);
+  --cs-sheen: linear-gradient(90deg, rgb(255 255 255 / 0) 0%, rgb(255 255 255 / 0.8) 50%, rgb(255 255 255 / 0) 100%);
+
+  --cs-font-display: 'IBM Plex Serif', ui-serif, Georgia, serif;
+  --cs-font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --cs-font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --cs-display-vf: normal;
+  --cs-display-weight: 600;
+  --cs-grain-opacity: 0.02;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   C · SWISS  (international style — near-black on true white, one hot red)
+   No gradients anywhere: every `--cs-grad-*` is a single colour written as two
+   identical stops, so the gradient utilities still resolve but read as flat
+   paint. Hairline rules, 3px radii, shadow used only to separate, never to
+   decorate.
+   ───────────────────────────────────────────────────────────────────────────── */
+:root[data-theme='swiss'] {
+  /* ground + surface */
+  --cs-paper: 255 255 255;
+  --cs-paper-sunk: 242 242 242;
+  --cs-surface: 255 255 255;
+  --cs-surface-ink: 17 17 17;
+
+  /* text */
+  --cs-ink: 17 17 17;
+  --cs-ink-muted: 87 87 87;
+
+  /* lines */
+  --cs-line: 225 225 225;
+  --cs-line-strong: 158 158 158;
+
+  /* primary — the single hot colour */
+  --cs-primary: 200 16 46;
+  --cs-primary-hover: 160 12 36;
+  --cs-primary-soft: 253 231 234;
+  --cs-primary-ring: 226 60 82;
+
+  /* secondary — neutral black, not a second hue */
+  --cs-secondary: 38 38 38;
+  --cs-secondary-soft: 237 237 237;
+
+  /* accent — backdrop only, never text */
+  --cs-accent: 255 74 0;
+  --cs-accent-soft: 255 236 228;
+  --cs-accent-ink: 166 46 0;
+
+  /* semantic */
+  --cs-teal: 0 122 100;
+  --cs-teal-soft: 224 242 238;
+  --cs-teal-ink: 0 90 73;
+  --cs-amber: 176 106 0;
+  --cs-amber-soft: 253 240 220;
+  --cs-amber-ink: 122 72 0;
+  --cs-slate: 112 112 112;
+  --cs-slate-soft: 238 238 238;
+  --cs-slate-ink: 69 69 69;
+  --cs-coral: 179 35 23;
+  --cs-coral-soft: 253 233 230;
+  --cs-coral-ink: 150 28 18;
+
+  /* shape */
+  --cs-radius-card: 3px;
+  --cs-radius-card-lg: 4px;
+  --cs-border-w: 1px;
+
+  /* depth */
+  --cs-shadow-card: 0 1px 1px rgb(17 17 17 / 0.05);
+  --cs-shadow-lift: 0 1px 2px rgb(17 17 17 / 0.09);
+  --cs-shadow-float: 0 2px 6px rgb(17 17 17 / 0.14);
+  --cs-shadow-glow-primary: 0 0 0 1px rgb(200 16 46 / 0.42);
+  --cs-shadow-glow-accent: 0 0 0 1px rgb(255 74 0 / 0.5);
+  --cs-shadow-inner-top: inset 0 1px 0 rgb(255 255 255 / 0.9);
+
+  /* feature surfaces — flat by design */
+  --cs-grad-primary: linear-gradient(135deg, #c8102e 0%, #c8102e 100%);
+  --cs-grad-accent: linear-gradient(135deg, #ff4a00 0%, #ff4a00 100%);
+  --cs-grad-ink: linear-gradient(150deg, #1a1a1a 0%, #111111 100%);
+  --cs-grad-coral: linear-gradient(135deg, #b32317 0%, #b32317 100%);
+  --cs-grad-teal: linear-gradient(135deg, #007a64 0%, #007a64 100%);
+  --cs-wash-hero: linear-gradient(180deg, rgb(200 16 46 / 0) 0%, rgb(200 16 46 / 0) 100%);
+  --cs-wash-panel: linear-gradient(160deg, rgb(255 255 255 / 1) 0%, rgb(255 255 255 / 1) 100%);
+  --cs-sheen: linear-gradient(90deg, rgb(255 255 255 / 0) 0%, rgb(255 255 255 / 0.6) 50%, rgb(255 255 255 / 0) 100%);
+
+  /* type */
+  --cs-font-display: 'Archivo', ui-sans-serif, system-ui, 'Helvetica Neue', Helvetica, sans-serif;
+  --cs-font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --cs-font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  /* Only Archivo's wght axis is requested, so there is nothing left to set here. */
+  --cs-display-vf: normal;
+  --cs-display-weight: 700;
+  --cs-grain-opacity: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   D · BLUEPRINT  (technical drafting — cool blue-white ground, mono display)
+   The distinctive move is the display face: headlines are set in IBM Plex Mono,
+   so titles read as drawing annotations rather than editorial type.
+   ───────────────────────────────────────────────────────────────────────────── */
+:root[data-theme='blueprint'] {
+  /* ground + surface */
+  --cs-paper: 238 244 250;
+  --cs-paper-sunk: 226 235 245;
+  --cs-surface: 252 254 255;
+  --cs-surface-ink: 12 30 48;
+
+  /* text */
+  --cs-ink: 13 31 50;
+  --cs-ink-muted: 71 94 119;
+
+  /* lines — drafting lines, so they carry more weight than usual */
+  --cs-line: 200 216 230;
+  --cs-line-strong: 148 174 197;
+
+  /* primary */
+  --cs-primary: 0 100 160;
+  --cs-primary-hover: 0 78 126;
+  --cs-primary-soft: 222 236 247;
+  --cs-primary-ring: 38 148 208;
+
+  /* secondary */
+  --cs-secondary: 58 76 158;
+  --cs-secondary-soft: 228 233 249;
+
+  /* accent — backdrop only, never text */
+  --cs-accent: 0 174 217;
+  --cs-accent-soft: 221 243 250;
+  --cs-accent-ink: 0 88 110;
+
+  /* semantic */
+  --cs-teal: 11 122 106;
+  --cs-teal-soft: 217 238 234;
+  --cs-teal-ink: 8 90 78;
+  --cs-amber: 170 108 0;
+  --cs-amber-soft: 250 239 216;
+  --cs-amber-ink: 118 72 0;
+  --cs-slate: 100 118 138;
+  --cs-slate-soft: 231 237 243;
+  --cs-slate-ink: 61 75 92;
+  --cs-coral: 196 48 40;
+  --cs-coral-soft: 251 232 229;
+  --cs-coral-ink: 150 32 26;
+
+  /* shape */
+  --cs-radius-card: 3px;
+  --cs-radius-card-lg: 5px;
+  --cs-border-w: 1px;
+
+  /* depth */
+  --cs-shadow-card: 0 1px 2px rgb(13 31 50 / 0.07);
+  --cs-shadow-lift: 0 1px 2px rgb(13 31 50 / 0.08), 0 6px 14px -8px rgb(13 31 50 / 0.16);
+  --cs-shadow-float: 0 2px 4px rgb(13 31 50 / 0.09), 0 14px 30px -14px rgb(13 31 50 / 0.24);
+  --cs-shadow-glow-primary: 0 0 0 1px rgb(0 100 160 / 0.25), 0 4px 12px -6px rgb(0 100 160 / 0.3);
+  --cs-shadow-glow-accent: 0 0 0 1px rgb(0 174 217 / 0.35), 0 4px 12px -6px rgb(0 174 217 / 0.3);
+  --cs-shadow-inner-top: inset 0 1px 0 rgb(255 255 255 / 0.95);
+
+  /* feature surfaces */
+  --cs-grad-primary: linear-gradient(135deg, #0a4a78 0%, #0064a0 100%);
+  --cs-grad-accent: linear-gradient(135deg, #2ea8cc 0%, #0079a3 100%);
+  --cs-grad-ink: linear-gradient(150deg, #152c44 0%, #0c1e30 100%);
+  --cs-grad-coral: linear-gradient(135deg, #a8271f 0%, #c43028 100%);
+  --cs-grad-teal: linear-gradient(135deg, #137a6b 0%, #0b7a6a 100%);
+  --cs-wash-hero: radial-gradient(120% 90% at 8% -10%, rgb(0 100 160 / 0.1) 0%, rgb(0 100 160 / 0) 55%),
+    radial-gradient(100% 80% at 95% 0%, rgb(0 174 217 / 0.09) 0%, rgb(0 174 217 / 0) 60%);
+  --cs-wash-panel: linear-gradient(160deg, rgb(252 254 255 / 1) 0%, rgb(246 250 254 / 1) 100%);
+  --cs-sheen: linear-gradient(90deg, rgb(255 255 255 / 0) 0%, rgb(255 255 255 / 0.85) 50%, rgb(255 255 255 / 0) 100%);
+
+  /* type */
+  --cs-font-display: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --cs-font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --cs-font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --cs-display-vf: normal;
+  --cs-display-weight: 600;
+  --cs-grain-opacity: 0.02;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   E · SUNRISE  (warm and friendly — peach ground, rounded geometric sans)
+   Generous radii and soft diffuse shadows. The bright coral-to-amber gradient
+   lives on `--cs-grad-accent` and the hero wash; `--cs-grad-primary` is the
+   deeper end of the same ramp because white text sits on it.
+   ───────────────────────────────────────────────────────────────────────────── */
+:root[data-theme='sunrise'] {
+  /* ground + surface */
+  --cs-paper: 255 246 238;
+  --cs-paper-sunk: 253 235 222;
+  --cs-surface: 255 255 255;
+  --cs-surface-ink: 58 32 26;
+
+  /* text */
+  --cs-ink: 58 31 26;
+  --cs-ink-muted: 122 86 76;
+
+  /* lines */
+  --cs-line: 247 227 213;
+  --cs-line-strong: 232 196 174;
+
+  /* primary */
+  --cs-primary: 184 50 28;
+  --cs-primary-hover: 152 38 20;
+  --cs-primary-soft: 255 233 226;
+  --cs-primary-ring: 240 122 96;
+
+  /* secondary — the violet edge of a sunrise sky */
+  --cs-secondary: 138 74 190;
+  --cs-secondary-soft: 243 235 253;
+
+  /* accent — backdrop only, never text */
+  --cs-accent: 255 178 62;
+  --cs-accent-soft: 255 240 214;
+  --cs-accent-ink: 146 80 0;
+
+  /* semantic */
+  --cs-teal: 13 134 110;
+  --cs-teal-soft: 222 243 237;
+  --cs-teal-ink: 9 100 82;
+  --cs-amber: 184 112 0;
+  --cs-amber-soft: 254 238 210;
+  --cs-amber-ink: 128 74 0;
+  --cs-slate: 128 114 124;
+  --cs-slate-soft: 243 238 240;
+  --cs-slate-ink: 76 66 74;
+  --cs-coral: 200 32 62;
+  --cs-coral-soft: 255 231 236;
+  --cs-coral-ink: 158 22 52;
+
+  /* shape */
+  --cs-radius-card: 22px;
+  --cs-radius-card-lg: 26px;
+  --cs-border-w: 1px;
+
+  /* depth */
+  --cs-shadow-card: 0 2px 4px rgb(122 60 30 / 0.05), 0 10px 26px -12px rgb(122 60 30 / 0.14);
+  --cs-shadow-lift: 0 3px 6px rgb(122 60 30 / 0.07), 0 18px 40px -16px rgb(122 60 30 / 0.2);
+  --cs-shadow-float: 0 6px 12px rgb(122 60 30 / 0.08), 0 32px 64px -26px rgb(122 60 30 / 0.28);
+  --cs-shadow-glow-primary: 0 0 0 1px rgb(184 50 28 / 0.16), 0 18px 44px -16px rgb(240 122 96 / 0.5);
+  --cs-shadow-glow-accent: 0 0 0 1px rgb(255 178 62 / 0.5), 0 16px 40px -16px rgb(255 138 74 / 0.55);
+  --cs-shadow-inner-top: inset 0 1px 0 rgb(255 255 255 / 0.85);
+
+  /* feature surfaces */
+  --cs-grad-primary: linear-gradient(135deg, #b8321c 0%, #b04416 52%, #a8520a 100%);
+  --cs-grad-accent: linear-gradient(135deg, #ff8a4a 0%, #ffb23e 100%);
+  --cs-grad-ink: linear-gradient(150deg, #4a2a22 0%, #2e1a15 100%);
+  --cs-grad-coral: linear-gradient(135deg, #c22a44 0%, #c8503a 100%);
+  --cs-grad-teal: linear-gradient(135deg, #0b8069 0%, #0a7561 100%);
+  --cs-wash-hero: radial-gradient(120% 90% at 8% -10%, rgb(255 138 74 / 0.2) 0%, rgb(255 138 74 / 0) 55%),
+    radial-gradient(100% 80% at 95% 0%, rgb(255 178 62 / 0.22) 0%, rgb(255 178 62 / 0) 60%),
+    radial-gradient(90% 70% at 60% 105%, rgb(138 74 190 / 0.1) 0%, rgb(138 74 190 / 0) 60%);
+  --cs-wash-panel: linear-gradient(160deg, rgb(255 255 255 / 1) 0%, rgb(255 250 245 / 1) 100%);
+  --cs-sheen: linear-gradient(90deg, rgb(255 255 255 / 0) 0%, rgb(255 255 255 / 0.9) 50%, rgb(255 255 255 / 0) 100%);
+
+  /* type */
+  --cs-font-display: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+  --cs-font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --cs-font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  /* Only Outfit's wght axis is requested and font-weight already drives it. */
+  --cs-display-vf: normal;
+  --cs-display-weight: 600;
+  --cs-grain-opacity: 0.02;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   F · COBALT  (crisp cool near-white — deep cobalt blue, geometric grotesque)
+   Product-like and precise. Whitespace and a confident blue do the work: medium
+   radii, hairline rules, and shadows that are wide and diffuse rather than
+   tight. The one saturated flourish is a cyan accent, backdrop only.
+   Measured: --cs-ink-muted 5.64:1 on --cs-paper, --cs-accent-ink 7.17:1 on
+   --cs-accent-soft, white 4.87:1 on the lightest --cs-grad-primary stop.
+   ───────────────────────────────────────────────────────────────────────────── */
+:root[data-theme='cobalt'] {
+  /* ground + surface */
+  --cs-paper: 247 249 252;
+  --cs-paper-sunk: 236 241 248;
+  --cs-surface: 255 255 255;
+  --cs-surface-ink: 12 21 42;
+
+  /* text */
+  --cs-ink: 13 23 44;
+  --cs-ink-muted: 88 100 124;
+
+  /* lines */
+  --cs-line: 226 232 241;
+  --cs-line-strong: 196 208 224;
+
+  /* primary — the cobalt itself */
+  --cs-primary: 21 58 189;
+  --cs-primary-hover: 16 46 152;
+  --cs-primary-soft: 233 238 255;
+  --cs-primary-ring: 74 110 230;
+
+  /* secondary — a violet-blue one step off the primary hue */
+  --cs-secondary: 92 50 200;
+  --cs-secondary-soft: 240 235 254;
+
+  /* accent — backdrop only, never text */
+  --cs-accent: 34 211 238;
+  --cs-accent-soft: 224 247 253;
+  --cs-accent-ink: 12 88 110;
+
+  /* semantic */
+  --cs-teal: 0 132 120;
+  --cs-teal-soft: 222 244 240;
+  --cs-teal-ink: 0 98 89;
+  --cs-amber: 214 146 20;
+  --cs-amber-soft: 254 242 220;
+  --cs-amber-ink: 132 80 0;
+  --cs-slate: 104 116 138;
+  --cs-slate-soft: 240 243 248;
+  --cs-slate-ink: 60 70 88;
+  --cs-coral: 214 52 70;
+  --cs-coral-soft: 255 235 237;
+  --cs-coral-ink: 168 28 46;
+
+  /* shape */
+  --cs-radius-card: 14px;
+  --cs-radius-card-lg: 18px;
+  --cs-border-w: 1px;
+
+  /* depth — soft and wide, tinted with the primary rather than pure black */
+  --cs-shadow-card: 0 1px 2px rgb(13 23 44 / 0.04), 0 6px 18px -6px rgb(13 23 44 / 0.08),
+    0 18px 40px -22px rgb(21 58 189 / 0.16);
+  --cs-shadow-lift: 0 2px 4px rgb(13 23 44 / 0.05), 0 14px 32px -12px rgb(13 23 44 / 0.11),
+    0 36px 72px -32px rgb(21 58 189 / 0.24);
+  --cs-shadow-float: 0 4px 10px rgb(13 23 44 / 0.06), 0 26px 56px -18px rgb(13 23 44 / 0.15),
+    0 56px 104px -48px rgb(21 58 189 / 0.3);
+  --cs-shadow-glow-primary: 0 0 0 1px rgb(21 58 189 / 0.14), 0 2px 6px rgb(13 23 44 / 0.06),
+    0 20px 48px -18px rgb(74 110 230 / 0.5);
+  --cs-shadow-glow-accent: 0 0 0 1px rgb(34 211 238 / 0.45), 0 16px 40px -16px rgb(34 211 238 / 0.45);
+  --cs-shadow-inner-top: inset 0 1px 0 rgb(255 255 255 / 0.9);
+
+  /* feature surfaces */
+  --cs-grad-primary: linear-gradient(135deg, #153abd 0%, #2b53d6 55%, #4568e0 100%);
+  --cs-grad-accent: linear-gradient(135deg, #22d3ee 0%, #4a8ff0 100%);
+  --cs-grad-ink: linear-gradient(150deg, #16203c 0%, #0d172c 60%, #080f1f 100%);
+  --cs-grad-coral: linear-gradient(135deg, #d63446 0%, #b31f38 100%);
+  --cs-grad-teal: linear-gradient(135deg, #0f9c8e 0%, #008478 100%);
+  --cs-wash-hero: radial-gradient(120% 90% at 6% -12%, rgb(21 58 189 / 0.12) 0%, rgb(21 58 189 / 0) 55%),
+    radial-gradient(100% 80% at 96% 0%, rgb(34 211 238 / 0.14) 0%, rgb(34 211 238 / 0) 60%),
+    radial-gradient(90% 70% at 62% 108%, rgb(92 50 200 / 0.09) 0%, rgb(92 50 200 / 0) 60%);
+  --cs-wash-panel: linear-gradient(160deg, rgb(255 255 255 / 1) 0%, rgb(247 249 252 / 1) 100%);
+  --cs-sheen: linear-gradient(90deg, rgb(255 255 255 / 0) 0%, rgb(255 255 255 / 0.85) 50%, rgb(255 255 255 / 0) 100%);
+
+  /* type */
+  --cs-font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --cs-font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --cs-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  /* Only Space Grotesk's wght axis is requested and font-weight already drives it. */
+  --cs-display-vf: normal;
+  --cs-display-weight: 700;
+  --cs-grain-opacity: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   G · SAGE  (soft warm off-white — muted forest green, terracotta secondary)
+   Calm without being neutral: an earthy green primary against a clay secondary,
+   one humanist superfamily for display and body, generous radii and low-contrast
+   hairlines. `--cs-teal` is deliberately pushed to cyan so it never reads as a
+   second shade of the primary green.
+   Measured: --cs-ink-muted 5.54:1 on --cs-paper, --cs-accent-ink 5.88:1 on
+   --cs-accent-soft, white 5.27:1 on the lightest --cs-grad-primary stop.
+   ───────────────────────────────────────────────────────────────────────────── */
+:root[data-theme='sage'] {
+  /* ground + surface */
+  --cs-paper: 250 249 244;
+  --cs-paper-sunk: 241 240 231;
+  --cs-surface: 255 255 255;
+  --cs-surface-ink: 24 38 31;
+
+  /* text */
+  --cs-ink: 26 40 33;
+  --cs-ink-muted: 92 104 94;
+
+  /* lines */
+  --cs-line: 233 231 220;
+  --cs-line-strong: 205 205 189;
+
+  /* primary */
+  --cs-primary: 45 104 78;
+  --cs-primary-hover: 34 82 61;
+  --cs-primary-soft: 228 242 234;
+  --cs-primary-ring: 104 168 138;
+
+  /* secondary — clay */
+  --cs-secondary: 158 70 36;
+  --cs-secondary-soft: 251 236 228;
+
+  /* accent — backdrop only, never text */
+  --cs-accent: 205 222 120;
+  --cs-accent-soft: 240 246 216;
+  --cs-accent-ink: 84 100 20;
+
+  /* semantic */
+  --cs-teal: 0 128 138;
+  --cs-teal-soft: 222 243 245;
+  --cs-teal-ink: 0 96 104;
+  --cs-amber: 198 140 0;
+  --cs-amber-soft: 253 240 216;
+  --cs-amber-ink: 122 78 0;
+  --cs-slate: 116 116 108;
+  --cs-slate-soft: 242 241 236;
+  --cs-slate-ink: 70 70 64;
+  --cs-coral: 190 44 74;
+  --cs-coral-soft: 253 232 236;
+  --cs-coral-ink: 154 26 54;
+
+  /* shape */
+  --cs-radius-card: 16px;
+  --cs-radius-card-lg: 20px;
+  --cs-border-w: 1px;
+
+  /* depth */
+  --cs-shadow-card: 0 1px 2px rgb(26 40 33 / 0.04), 0 8px 20px -8px rgb(26 40 33 / 0.09),
+    0 20px 44px -24px rgb(45 104 78 / 0.18);
+  --cs-shadow-lift: 0 2px 4px rgb(26 40 33 / 0.05), 0 16px 34px -14px rgb(26 40 33 / 0.12),
+    0 38px 74px -34px rgb(45 104 78 / 0.26);
+  --cs-shadow-float: 0 4px 10px rgb(26 40 33 / 0.06), 0 28px 58px -20px rgb(26 40 33 / 0.16),
+    0 58px 106px -50px rgb(45 104 78 / 0.32);
+  --cs-shadow-glow-primary: 0 0 0 1px rgb(45 104 78 / 0.18), 0 2px 6px rgb(26 40 33 / 0.06),
+    0 20px 46px -18px rgb(104 168 138 / 0.55);
+  --cs-shadow-glow-accent: 0 0 0 1px rgb(205 222 120 / 0.6), 0 16px 40px -16px rgb(168 200 94 / 0.6);
+  --cs-shadow-inner-top: inset 0 1px 0 rgb(255 255 255 / 0.88);
+
+  /* feature surfaces */
+  --cs-grad-primary: linear-gradient(135deg, #22513d 0%, #2d684e 52%, #35785a 100%);
+  --cs-grad-accent: linear-gradient(135deg, #cdde78 0%, #a8c85e 100%);
+  --cs-grad-ink: linear-gradient(150deg, #26382f 0%, #1a2821 60%, #121b16 100%);
+  --cs-grad-coral: linear-gradient(135deg, #c93a5e 0%, #a8213f 100%);
+  --cs-grad-teal: linear-gradient(135deg, #0d8c96 0%, #00707a 100%);
+  --cs-wash-hero: radial-gradient(120% 90% at 6% -12%, rgb(45 104 78 / 0.13) 0%, rgb(45 104 78 / 0) 55%),
+    radial-gradient(100% 80% at 96% 0%, rgb(205 222 120 / 0.24) 0%, rgb(205 222 120 / 0) 60%),
+    radial-gradient(90% 70% at 62% 108%, rgb(158 70 36 / 0.09) 0%, rgb(158 70 36 / 0) 60%);
+  --cs-wash-panel: linear-gradient(160deg, rgb(255 255 255 / 1) 0%, rgb(251 250 245 / 1) 100%);
+  --cs-sheen: linear-gradient(90deg, rgb(255 255 255 / 0) 0%, rgb(255 255 255 / 0.85) 50%, rgb(255 255 255 / 0) 100%);
+
+  /* type */
+  --cs-font-display: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --cs-font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --cs-font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  /* Only Manrope's wght axis is requested and font-weight already drives it. */
+  --cs-display-vf: normal;
+  --cs-display-weight: 800;
+  --cs-grain-opacity: 0.02;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   H · PRISM  (near-white, near-black text — one violet → cyan gradient)
+   Almost monochrome on purpose. All the colour is saved for a single spectrum
+   sweep, which appears only on the hero wash and the primary action; everything
+   else is ink on white with large radii and barely-there shadows. The gradient's
+   cyan end is taken down to a deep teal so white type clears 4.5:1 across the
+   whole sweep — the bright end lives on `--cs-grad-accent`, which is only ever
+   used as a decorative rail.
+   Measured: --cs-ink-muted 6.43:1 on --cs-paper, --cs-accent-ink 6.97:1 on
+   --cs-accent-soft, white 5.70:1 on the lightest --cs-grad-primary stop.
+   ───────────────────────────────────────────────────────────────────────────── */
+:root[data-theme='prism'] {
+  /* ground + surface */
+  --cs-paper: 252 252 253;
+  --cs-paper-sunk: 244 244 247;
+  --cs-surface: 255 255 255;
+  --cs-surface-ink: 10 10 14;
+
+  /* text */
+  --cs-ink: 10 10 14;
+  --cs-ink-muted: 92 92 104;
+
+  /* lines */
+  --cs-line: 232 232 238;
+  --cs-line-strong: 199 199 209;
+
+  /* primary — the violet end of the sweep */
+  --cs-primary: 88 28 235;
+  --cs-primary-hover: 70 18 200;
+  --cs-primary-soft: 238 234 254;
+  --cs-primary-ring: 138 96 250;
+
+  /* secondary — the cyan end, darkened enough to be text */
+  --cs-secondary: 0 112 145;
+  --cs-secondary-soft: 224 242 249;
+
+  /* accent — backdrop only, never text */
+  --cs-accent: 34 224 240;
+  --cs-accent-soft: 222 250 253;
+  --cs-accent-ink: 0 92 110;
+
+  /* semantic */
+  --cs-teal: 0 138 106;
+  --cs-teal-soft: 221 244 236;
+  --cs-teal-ink: 0 102 78;
+  --cs-amber: 214 146 20;
+  --cs-amber-soft: 253 241 217;
+  --cs-amber-ink: 128 78 0;
+  --cs-slate: 104 104 118;
+  --cs-slate-soft: 242 242 246;
+  --cs-slate-ink: 62 62 74;
+  --cs-coral: 214 32 84;
+  --cs-coral-soft: 255 232 239;
+  --cs-coral-ink: 168 16 66;
+
+  /* shape */
+  --cs-radius-card: 20px;
+  --cs-radius-card-lg: 28px;
+  --cs-border-w: 1px;
+
+  /* depth — restrained; separation only */
+  --cs-shadow-card: 0 1px 2px rgb(10 10 14 / 0.04), 0 6px 16px -8px rgb(10 10 14 / 0.08);
+  --cs-shadow-lift: 0 2px 4px rgb(10 10 14 / 0.05), 0 14px 30px -14px rgb(10 10 14 / 0.12);
+  --cs-shadow-float: 0 4px 10px rgb(10 10 14 / 0.06), 0 26px 54px -22px rgb(10 10 14 / 0.18);
+  --cs-shadow-glow-primary: 0 0 0 1px rgb(88 28 235 / 0.16), 0 18px 44px -18px rgb(138 96 250 / 0.5);
+  --cs-shadow-glow-accent: 0 0 0 1px rgb(34 224 240 / 0.45), 0 16px 40px -16px rgb(34 224 240 / 0.42);
+  --cs-shadow-inner-top: inset 0 1px 0 rgb(255 255 255 / 0.92);
+
+  /* feature surfaces */
+  --cs-grad-primary: linear-gradient(120deg, #581ceb 0%, #3a3ce0 48%, #0b6f8f 100%);
+  --cs-grad-accent: linear-gradient(120deg, #7c3aed 0%, #22e0f0 100%);
+  --cs-grad-ink: linear-gradient(150deg, #17171f 0%, #0a0a0e 100%);
+  --cs-grad-coral: linear-gradient(135deg, #d62054 0%, #a8124a 100%);
+  --cs-grad-teal: linear-gradient(135deg, #0aa37e 0%, #008a6a 100%);
+  --cs-wash-hero: radial-gradient(115% 85% at 4% -14%, rgb(88 28 235 / 0.13) 0%, rgb(88 28 235 / 0) 58%),
+    radial-gradient(105% 80% at 98% 2%, rgb(34 224 240 / 0.16) 0%, rgb(34 224 240 / 0) 62%),
+    radial-gradient(85% 65% at 55% 110%, rgb(0 112 145 / 0.07) 0%, rgb(0 112 145 / 0) 60%);
+  --cs-wash-panel: linear-gradient(160deg, rgb(255 255 255 / 1) 0%, rgb(252 252 253 / 1) 100%);
+  --cs-sheen: linear-gradient(90deg, rgb(255 255 255 / 0) 0%, rgb(255 255 255 / 0.9) 50%, rgb(255 255 255 / 0) 100%);
+
+  /* type */
+  --cs-font-display: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --cs-font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --cs-font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  /* Only Plus Jakarta Sans' wght axis is requested and font-weight already drives it. */
+  --cs-display-vf: normal;
+  --cs-display-weight: 800;
+  --cs-grain-opacity: 0;
+}
