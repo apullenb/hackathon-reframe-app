@@ -155,7 +155,7 @@ export function ConflictLensResult({
           id="neutral-summary-heading"
           className="mt-4 max-w-3xl font-display text-2xl leading-tight text-ink sm:text-display-sm lg:text-display-md"
         >
-          What happened, <span className="text-gradient">without a verdict</span>
+          What happened
         </h1>
 
         <p className="mt-5 min-w-0 max-w-4xl whitespace-pre-wrap break-words border-t border-line pt-5 font-display text-lg leading-snug text-ink sm:text-xl">
