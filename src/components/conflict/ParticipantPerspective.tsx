@@ -50,6 +50,15 @@ export function ParticipantPerspective({
 
   // Indigo for the reader's own column, ink for the other. Same weight, different hue: the pair
   // matches the transcript skins in SpeakerConfirmation so the columns stay recognisable.
+  /**
+   * When the speaker's label IS "You" — which happens whenever the conversation came from a
+   * screenshot with no names in it — the name is already doing the pronoun's job. Repeating it
+   * gives "What You said" and a "You" badge on a card titled You.
+   */
+  const nameIsYou = displayName.trim().toLowerCase() === 'you';
+  const saidHeading = nameIsYou ? 'What you said' : `What ${displayName} said`;
+  const didNotSay = nameIsYou ? 'You did not say these' : `${displayName} did not say these`;
+
   const rule = isUser ? 'bg-grad-primary' : 'bg-grad-ink';
   const monogramSkin = isUser ? 'bg-grad-primary text-surface' : 'bg-surface-ink text-paper';
 
@@ -87,7 +96,7 @@ export function ParticipantPerspective({
             </h3>
           </div>
         </div>
-        {isUser ? (
+        {isUser && !nameIsYou ? (
           <Badge tone="primary" size="sm">
             You
           </Badge>
@@ -99,7 +108,7 @@ export function ParticipantPerspective({
           <div className="flex items-center gap-2">
             <Quote aria-hidden="true" className="h-[18px] w-[18px] shrink-0 text-primary" />
             <h4 id={statedId} className="min-w-0 text-base font-bold text-ink">
-              What {displayName} said
+              {saidHeading}
             </h4>
           </div>
           <p className="mt-1 text-sm font-semibold leading-relaxed text-ink-muted">
@@ -139,8 +148,8 @@ export function ParticipantPerspective({
             </Badge>
           </div>
           <p className="mt-1 text-sm font-semibold leading-relaxed text-ink-muted">
-            Possible concerns, not statements. {displayName} did not say these — the label on each
-            one says how far the wording actually supports it.
+            Possible concerns, not statements. {didNotSay} — the label on each one says how far
+            the wording actually supports it.
           </p>
           <ul className="mt-3 space-y-3">
             {possibleConcerns.map((concern, index) => (

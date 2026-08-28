@@ -104,32 +104,33 @@ export function buildSaturdayDinner(speakers: ConflictSpeaker[]): ConflictLensRe
     participants: [
       {
         speakerId: self.id,
+        // Second person throughout: this column is headed "What you said".
         statedPosition: [
-          'Their mother needed somewhere for Saturday, and they answered that it could be made to work.',
-          'They describe it as one dinner.',
-          'They have said twice that they will handle it, and that the other person does not have to do anything.',
-          'They say they were thinking about their mother when they answered.',
+          'Your mother needed somewhere for Saturday, and you answered that it could be made to work.',
+          'You describe it as one dinner.',
+          'You have said twice that you will handle it, and that they do not have to do anything.',
+          'You say you were thinking about your mother when you answered.',
         ],
         possibleConcerns: [
           {
-            text: 'They may feel that their family is treated as an imposition rather than as ordinary company.',
+            text: 'You may feel that your family is treated as an imposition rather than as ordinary company.',
             support: 'plausible',
             evidence:
               '"You always act like my family coming over is a crisis" is about the reaction to the family, not about Saturday.',
           },
           {
-            text: 'They may have answered in the moment because declining their mother did not feel available to them.',
+            text: 'You may have answered in the moment because declining your mother did not feel available to you.',
             support: 'plausible',
             evidence:
               '"Mom needed somewhere" gives the need as the reason for the answer, and no alternative is mentioned as having been considered.',
           },
           {
-            text: 'They may hear the reference to Christmas as a record being kept about their reliability rather than as a point about one evening.',
+            text: 'You may hear the reference to Christmas as a record being kept about your reliability rather than as a point about one evening.',
             support: 'plausible',
             evidence: '"Seriously? I thought we were past that."',
           },
           {
-            text: 'They may believe that taking on all of the work themselves is the way to end the disagreement.',
+            text: 'You may believe that taking on all of the work yourself is the way to end the disagreement.',
             support: 'speculative',
             evidence:
               'Inferred from "You don\'t have to do anything. I can handle dinner", which offers to absorb the work rather than to divide it. Not stated.',

@@ -178,16 +178,16 @@ export function ConflictLensResult({
           </span>
           <div className="min-w-0">
             <p className="font-mono text-sm font-semibold uppercase tracking-widest text-ink-muted">
-              Both accounts, equal weight
+              The two accounts
             </p>
             <h2
               id="participants-heading"
               className="mt-1 font-display text-2xl leading-tight text-ink sm:text-display-sm"
             >
-              Each side, on its own terms
+              What each of you said
             </h2>
             <p className="mt-2 max-w-2xl text-base leading-relaxed text-ink-muted">
-              Two columns, same treatment. Reading one does not mean agreeing with it.
+              And what may be sitting underneath it.
             </p>
           </div>
         </div>
@@ -256,7 +256,7 @@ export function ConflictLensResult({
             </span>
             <div className="min-w-0">
               <p className="font-mono text-sm font-semibold uppercase tracking-widest text-ink-muted">
-                An order that tends to hold
+                In this order
               </p>
               <h2
                 id="structure-heading"

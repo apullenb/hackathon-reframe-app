@@ -117,8 +117,8 @@ export function FactsPanel({
             What is settled, and what is not
           </h2>
           <p className="mt-2 max-w-2xl text-base leading-relaxed text-ink-muted">
-            Separated on purpose. Agreement, disagreement, and the questions nobody answered are
-            three different things.
+            Agreement, disagreement, and the questions nobody answered are three different
+            things.
           </p>
         </div>
       </div>
