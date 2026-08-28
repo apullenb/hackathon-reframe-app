@@ -429,6 +429,43 @@ Add an entry after every meaningful build phase. Copy the template for each entr
 
 - Presentation Mode density, Under the Hood panel, and the remaining two scenario walkthroughs.
 
+### Milestone 9 — Three features, demo ready
+
+**Time:** 23:05–23:55 CDT  
+**Phase/goal:** Rebuild around Communicate, Repair and Inspect after the twelve-feature console was rejected as unusable; then polish for the demo.
+
+**Actions taken:**
+
+- Cut the product to three plainly-named features and deleted the console shell, tool registry, situation store and nine surfaces (see F-016 for why).
+- Rebuilt Communicate on the context controls the owner already recognised, with a writing/receiving toggle and screenshot input on the receiving side.
+- Built Repair (screenshot **or** plain description) and Inspect (a 68-node branching question flow) with two agents.
+- Removed every pre-selected role. Nothing assumes who the user is.
+- Fixed three layout defects the owner spotted from a screenshot.
+
+**What worked:**
+
+- Reusing the verified analysis views meant the rebuild cost two agents, not five. The AI relay, provider failover, Zod gate, fixtures and safety logic were untouched throughout — **43/43 fixture and 53/53 functional checks passed continuously across two full re-architectures.**
+- The Inspect → translator handoff is the strongest moment in the product: five branching questions produce a sentence, and one button carries it into the translator already written.
+
+**What did not work:**
+
+- My automated UI audit reported **zero issues** on screens that were visibly broken. The chips wrapped legally, the label spill sat inside a `min-w-0` box, and Repair's content was genuinely in the DOM — just below the fold. A single screenshot from the owner found all three in one look. Recorded as F-017.
+
+**Verification/evidence:**
+
+- Layout fixes verified across **all nine themes** at 820px: route labels ~106px inside their boxes, quick-pick chips 4 per row, 0 elements past their parent, no horizontal scroll.
+- Contrast: **0 failures** on all three screens. Tap targets: **0 under 44px** after raising the header and Back controls. No text under 12px. Console: **no errors**.
+- Inspect walked end to end: 5 branching questions → outcome → sentence carried into Communicate.
+- `tsc` 0, `eslint` 0, fixtures 43/43, functional 53/53, production build clean.
+
+**Files materially changed:**
+
+- `src/App.tsx`, `src/components/communicate2/`, `src/components/repair2/`, `src/components/inspect2/`, `src/components/context/{ContextBuilder,RoleRoute}.tsx`, `README.md`
+
+**Next step:**
+
+- Optional: trim the nine themes to two or three. Nine is clutter in a Settings panel for a demo.
+
 ### Milestone Entry Template
 
 **Time:**  
@@ -512,6 +549,7 @@ Record failures that consumed meaningful time or changed the approach. Failed ex
 | F-014 | 22:35 | Wire the presentation scenario shortcuts (`1`/`2`/`3`) with a guard that skips the handler while the user is typing: `const target = event.target as HTMLElement \| null; target?.matches(...)`. | **Every keyboard shortcut silently died** whenever focus was on the document rather than an element. | `event.target` is not always an `Element` — with focus on the document it is `window`, which has no `.matches()`. Optional chaining guards `null`, not a missing method, so the call threw and killed the whole handler. Real key presses usually target `body` (which does have `.matches`), so it worked by luck in manual use and failed under a dispatched event. | Guarded on the type instead: `target instanceof Element && target.matches(...)`. | An optional chain reads like a safety check but only covers null/undefined. When the value's *type* is the uncertainty, `instanceof` is the actual guard. Found only because a scripted key press targeted `body` differently than a manual one would. |
 | F-015 | 22:40 | Ship the dark `console` theme using the brief's palette directly. | Two elements measured **4.09:1** against a 4.5 floor: the product mark and a primary button label. | Components put `text-surface` on `bg-grad-primary` — correct in the eight light themes where `surface` is white, wrong in a dark theme where `surface` is near-black. The gradient's darkest stop was too dark to carry dark text. This is the exact mirror of the `text-white`-on-gradient problem an earlier theme agent flagged: a hardcoded assumption about which end of the palette text sits on. | Lightened only the gradient's first stop (`#2f7fd6` → `#4a9bf5`) so every stop clears 5.3:1 against `--cs-surface`. Re-measured: **0 failures across 259 text nodes** on two screens; `contrastAudited` then set to true. | A theme system does not by itself make components theme-safe. Any component that names a *specific* colour for foreground-on-accent carries an assumption about the palette's polarity, and that assumption only breaks when a theme inverts. |
 | F-016 | 23:05 | Build the UI exactly as the brief specified: five workspaces, a four-region shell, twelve features named after developer concepts (Stack Trace, Unit Tests, Patch, Breakpoint, Message Compiler). | The owner could not tell what the app was or how to use it. A complete redo was ordered. | Three compounding causes. **(1)** The app opened on an abstract question with nothing demonstrated — six panels, all empty, each announcing its own emptiness ("Nothing confirmed yet", "Nothing has run yet"). Empty scaffolding reads as complexity with no payoff. **(2)** The twelve names are developer metaphors; without already holding the metaphor, "Stack Trace" says nothing about talking to your wife. **(3)** The one thing that sells the product — bad message in, honest message out — sat four clicks behind a rail of twelve tools. | Rebuilt around three plainly-named things, translator first, with the context controls the owner already recognised. Deleted the shell, registry, situation store and nine surfaces. | **A spec can be followed correctly and still produce the wrong product.** The brief's §22 said a new viewer must understand the premise in under 20 seconds, and its §3 architecture made that impossible; I implemented the architecture and never tested it against the acceptance criterion. The signal was there and I walked past it: when the shell agent reported back "six regions, all empty on first paint", that was the finding, and I treated it as a status update. |
+| F-017 | 23:45 | Verify the simplified UI with an automated audit — clipping, overflow, elements past their parent — across three tabs at 390/820/1440. | **Reported zero issues on screens that were visibly broken.** The owner's screenshot showed "RECIPIENT" overflowing its border, role chips stacked one per line as skinny boxes, and Repair apparently empty after choosing roles. | All three were *layout squeeze*, not technical overflow, and my checks only looked for the latter. The chips wrapped **legally** into a too-narrow column. The label spill sat inside a `min-w-0` container so it never exceeded a scroll box. Repair's content was genuinely in the DOM — just pushed below the fold by a tall role picker. | Widened the role-card breakpoint so cards get real room, cut route-label tracking from 0.16em to 0.08em, and collapsed the Repair role picker to one line once chosen. Verified across all nine themes. | **"No measurable overflow" is not "looks right".** A layout can be squeezed to uselessness while every box still technically contains its contents. I trusted a green checker over looking at the screen, and the owner found in one glance what three widths of instrumentation missed. Look first, measure second. |
 | F-001 | 11:44 | Build the all-modes response union with `z.discriminatedUnion('mode', [...])` using the three per-mode schemas directly. | Type error: the Say It Better schema is not assignable — `discriminatedUnion` requires object schemas. | `.superRefine()` wraps a `ZodObject` in a `ZodEffects`, which no longer exposes the discriminator key. | Call `.innerType()` for the union member while keeping the full refined schema as the per-mode gate that `validateResponse()` actually uses. Cost: ~3 minutes. | A refined schema and a union member are different objects. The gate must use the refined one — using the union for validation would have silently dropped the D-004 strictness that closes the empty-result hole. |
 
 ---

@@ -203,10 +203,10 @@ export function App() {
                 configuredMode={config.mode}
                 errored={Boolean(error)}
               />
-              <Button variant="outline" size="sm" leadingIcon={Settings2} onClick={() => setSettingsOpen(true)}>
+              <Button variant="outline" leadingIcon={Settings2} onClick={() => setSettingsOpen(true)}>
                 Settings
               </Button>
-              <Button variant="ghost" size="sm" leadingIcon={RotateCcw} onClick={resetAll}>
+              <Button variant="ghost" leadingIcon={RotateCcw} onClick={resetAll}>
                 Start over
               </Button>
             </div>

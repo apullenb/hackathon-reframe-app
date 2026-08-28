@@ -1,9 +1,28 @@
 # Context Switch
 
-An AI communication translator. You tell it who you are, who you are talking to, and what
-you are trying to accomplish. It then does one of three jobs: rewrite what you actually mean
-into something the other person can hear, take apart a message you received, or map a
-two-person conflict.
+Help saying the hard thing, understanding what someone meant, and working out what an
+argument is actually about.
+
+Three things, in the order people need them:
+
+| | What it does |
+|---|---|
+| **Communicate** | The translator. Say what you actually mean and get a version the other person can hear — or paste/screenshot something you received and see what it says versus what you might be adding to it. |
+| **Repair** | Conflict help. Upload a screenshot of the conversation or just describe the argument in your own words, and get each person's perspective and what the disagreement is actually about. |
+| **Inspect** | Guided questions with clickable answers, each one following from your last, to work out what you are feeling and either sit with it or say it. |
+
+### What makes it more than a rewriter
+
+- **Context changes the output.** Your role, their role, the relationship and the channel go into
+  the request. The same sentence becomes a different message for a manager than for a partner.
+- **It will not invent facts.** If an honest rewrite would need a commitment, an approval or a date
+  you never gave, it asks instead of writing one in.
+- **Evidence is separated from guessing.** Every inference is labelled, and what cannot be known
+  from a message gets its own section rather than being quietly dropped.
+- **It does not pick a winner.** Conflict help describes behaviour, never character, and refuses to
+  flatten a genuine imbalance into "you both need to communicate better".
+
+Not therapy, diagnosis, legal advice, or crisis support, and it says so on screen.
 
 ## What makes it different from a "make this more professional" rewriter
 

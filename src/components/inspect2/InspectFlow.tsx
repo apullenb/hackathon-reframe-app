@@ -184,7 +184,7 @@ export function InspectFlow({ otherPerson, onTakeToTranslator }: InspectFlowProp
     return (
       <section aria-label="What you found" className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button variant="ghost" size="sm" leadingIcon={ArrowLeft} onClick={goBack}>
+          <Button variant="ghost" leadingIcon={ArrowLeft} onClick={goBack}>
             Back a question
           </Button>
           <p className="font-mono text-sm font-semibold uppercase tracking-[0.14em] text-ink-muted">
@@ -223,7 +223,6 @@ export function InspectFlow({ otherPerson, onTakeToTranslator }: InspectFlowProp
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button
           variant="ghost"
-          size="sm"
           leadingIcon={ArrowLeft}
           disabled={trail.length === 0}
           onClick={goBack}
