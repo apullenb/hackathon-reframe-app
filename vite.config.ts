@@ -9,6 +9,11 @@ export default defineConfig(({ mode }) => {
   // inside vite-plugin-ai-proxy.ts, which runs in the Node process and is not bundled.
   const env = loadEnv(mode, process.cwd(), '');
   const aiMode = env.VITE_AI_MODE || env.AI_MODE || 'auto';
+  // Non-secret deployment label. 'vibeland' switches the live-AI transport to the platform's
+  // own relay (src/ai/platform.ts), which holds the key server-side the same way the dev plugin
+  // does — so the hosted build gets live AI with no key in the browser. Empty everywhere else.
+  const deployTarget = env.VITE_DEPLOY_TARGET || '';
+  const vibelandSlug = env.VITE_VIBELAND_SLUG || '';
 
   return {
     // GitHub Pages serves a project site from /<repo>/, so assets need that prefix. Set by the
@@ -30,6 +35,11 @@ export default defineConfig(({ mode }) => {
       // Fixes F-003: .env documents AI_MODE, but the client only ever read VITE_AI_MODE, so
       // setting AI_MODE=fixture silently did nothing. One variable now drives both sides.
       'import.meta.env.VITE_AI_MODE': JSON.stringify(aiMode),
+      // Defined here rather than relying on Vite's automatic VITE_* inlining, for the same
+      // reason as VITE_AI_MODE above: loadEnv reads the process environment too, so a value set
+      // only by the deploy command still reaches the client.
+      'import.meta.env.VITE_DEPLOY_TARGET': JSON.stringify(deployTarget),
+      'import.meta.env.VITE_VIBELAND_SLUG': JSON.stringify(vibelandSlug),
     },
   };
 });

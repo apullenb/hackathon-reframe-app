@@ -52,7 +52,7 @@ export function ScottCounter() {
           )}
         >
           <Plus className="h-3 w-3" strokeWidth={2.5} aria-hidden="true" />
-          <span className="text-[14px] font-bold leading-none" aria-hidden="true">
+          <span className="text-[11px] font-bold leading-none" aria-hidden="true">
             1
           </span>
           <span className="sr-only">Open the Scott counter</span>

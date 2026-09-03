@@ -242,7 +242,7 @@ export function ModeSelector({ selected, onSelect, variant = 'cards' }: ModeSele
             <span className="relative font-display text-2xl font-semibold leading-tight tracking-tight text-ink">
               {entry.name}
             </span>
-            <span className="relative text-[1.2rem] font-medium leading-relaxed text-ink-muted">
+            <span className="relative text-[1.0125rem] font-medium leading-relaxed text-ink-muted">
               {entry.description}
             </span>
 

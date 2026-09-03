@@ -6,6 +6,7 @@ import {
   DIRECT_MODE_PRIVACY_NOTICE,
   clearUserKey,
   hasUserKey,
+  isPlatformRelay,
   setUserKey,
   type AiProbeResult,
 } from '@/ai';
@@ -24,8 +25,9 @@ type AiSettingsDrawerProps = {
 /**
  * The bring-your-own-key drawer.
  *
- * Only reachable when the dev proxy is unusable. When the proxy is available the drawer says so
- * and never asks for a key — a key in the browser is strictly worse, so we don't invite it.
+ * Only reachable when the server relay is unusable. When a relay is available the drawer says so
+ * and never asks for a key — a key in the browser is strictly worse, so we don't invite it. On
+ * Vibeland a relay is always present, so the key field never renders there at all.
  *
  * The key is typed into a password field, handed straight to `setUserKey`, and never held in
  * this component's state after submit. It is never logged and never leaves the key store.
@@ -58,6 +60,7 @@ export function AiSettingsDrawer({
   if (!open) return null;
 
   const proxyLive = probe?.proxyAvailable ?? false;
+  const onPlatform = isPlatformRelay();
 
   const handleSave = () => {
     const trimmed = draftKey.trim();
@@ -114,17 +117,22 @@ export function AiSettingsDrawer({
             <CardBody>
               <p className="flex items-center gap-2 text-sm font-bold text-ink">
                 <Cloud className="h-4 w-4" aria-hidden="true" />
-                Local dev route
+                {onPlatform ? 'Vibeland AI relay' : 'Local dev route'}
               </p>
               <p className="mt-2 text-sm font-medium leading-relaxed text-ink-muted">
-                {proxyLive
-                  ? 'Reachable, with a key configured. Live requests go through the Vite dev server, so the key stays in the Node process and never reaches this browser. This is the preferred path and no key is needed here.'
-                  : 'Not available. Either the dev server is not running, or no ANTHROPIC_API_KEY is set in .env. The built-in examples still work with no configuration at all.'}
+                {onPlatform
+                  ? 'Live requests go through Vibeland\u2019s own Claude relay. The key is held by the platform and never reaches this browser, so nothing is needed from you here. If an owner has not added a key to this app yet, live requests fall back to the built-in examples and say so.'
+                  : proxyLive
+                    ? 'Reachable, with a key configured. Live requests go through the Vite dev server, so the key stays in the Node process and never reaches this browser. This is the preferred path and no key is needed here.'
+                    : 'Not available. Either the dev server is not running, or no ANTHROPIC_API_KEY is set in .env. The built-in examples still work with no configuration at all.'}
               </p>
             </CardBody>
           </Card>
 
-          {proxyLive ? null : (
+          {/* On Vibeland the platform supplies the key, so the field is not merely hidden —
+              the condition is a build-time constant, and the whole block is dropped from the
+              bundle. An app should never ask for a key it does not need. */}
+          {proxyLive || onPlatform ? null : (
             <Card tone="default">
               <CardBody>
                 <p className="flex items-center gap-2 text-sm font-bold text-ink">
@@ -244,8 +252,14 @@ export function AiSettingsDrawer({
             <CardBody>
               <p className="text-sm font-bold text-ink">Preference order</p>
               <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm font-medium leading-relaxed text-ink-muted">
-                <li>Local dev route — key stays on the server</li>
-                <li>Your own key — only if the route is unreachable and you supplied one</li>
+                <li>
+                  {onPlatform
+                    ? 'Vibeland AI relay — key stays on the platform'
+                    : 'Local dev route — key stays on the server'}
+                </li>
+                {onPlatform ? null : (
+                  <li>Your own key — only if the route is unreachable and you supplied one</li>
+                )}
                 <li>Built-in examples — always available, no network</li>
               </ol>
             </CardBody>

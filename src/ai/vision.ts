@@ -1,15 +1,17 @@
 import type { ContextSwitchError } from '@/types/contracts';
 import { screenshotExtractionSchema, type ScreenshotExtraction } from '@/schemas/screenshot';
-import { buildScreenshotExtractionPrompt } from './prompts';
+import { buildScreenshotExtractionPrompt, type PromptPair } from './prompts';
 import { extractJsonObject } from './ProxyAiClient';
-import { PROXY_ENDPOINT, aiError } from './types';
+import { PROXY_ENDPOINT, TransportError, aiError } from './types';
+import { callPlatformRelay, isPlatformRelay } from './platform';
 
 /**
  * Screenshot transcription (spec §19).
  *
  * Goes through the same protected relay as everything else, so the image is sent to the provider
- * by the Node process and no key touches the browser. The image is held in memory for the duration
- * of the request and nothing writes it anywhere — spec §19 step 7.
+ * by a server and no key touches the browser. Locally that server is the Vite dev process; on
+ * Vibeland it is the platform's own relay (see ./platform.ts). The image is held in memory for
+ * the duration of the request and nothing writes it anywhere — spec §19 step 7.
  *
  * PRIVACY, stated plainly because the UI has to say it too: the screenshot leaves the device. It
  * goes to the configured AI provider. There is no on-device OCR here, and the UI must not imply
@@ -24,6 +26,9 @@ export const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 
 /** Extraction can take longer than a text call: a large image plus a full transcription. */
 const EXTRACTION_TIMEOUT_MS = 45_000;
+
+/** Enough for a full transcription of a long screenshot; well under the platform ceiling. */
+const EXTRACTION_MAX_TOKENS = 2048;
 
 export type ExtractionResult =
   | { ok: true; value: ScreenshotExtraction }
@@ -85,55 +90,9 @@ export async function extractConversationFromImage(
   options.signal?.addEventListener('abort', onExternalAbort);
 
   try {
-    const response = await fetch(PROXY_ENDPOINT, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      signal: controller.signal,
-      body: JSON.stringify({
-        system: prompt.system,
-        user: prompt.user,
-        maxTokens: 2048,
-        images: [image],
-      }),
-    });
+    const text = await requestExtractionText(prompt, image, controller.signal);
 
-    if (!response.ok) {
-      const failure = (await response.json().catch(() => ({}))) as RelayFailure;
-      const code = typeof failure.error === 'string' ? failure.error : `http_${response.status}`;
-      if (response.status === 503 && code === 'no_key_configured') {
-        return {
-          ok: false,
-          error: aiError('no_client_available', {
-            userMessage:
-              'Reading a screenshot needs a live AI connection, which is not configured right now. You can paste the conversation as text instead.',
-          }),
-        };
-      }
-      const providerMessage =
-        typeof failure.providerMessage === 'string' ? ` — ${failure.providerMessage}` : '';
-      return {
-        ok: false,
-        error: aiError('provider_error', {
-          userMessage:
-            'The screenshot could not be read. You can try again, or paste the conversation as text instead.',
-          detail: `${response.status}:${code}${providerMessage}`,
-        }),
-      };
-    }
-
-    const payload = (await response.json()) as RelaySuccess;
-    if (typeof payload.text !== 'string' || payload.text.trim().length === 0) {
-      return {
-        ok: false,
-        error: aiError('provider_error', {
-          userMessage:
-            'The screenshot could not be read. You can try again, or paste the conversation as text instead.',
-          detail: 'relay returned no text',
-        }),
-      };
-    }
-
-    const raw = extractJsonObject(payload.text);
+    const raw = extractJsonObject(text);
     if (!raw) {
       return {
         ok: false,
@@ -177,6 +136,9 @@ export async function extractConversationFromImage(
 
     return { ok: true, value: validated.data };
   } catch (error) {
+    if (error instanceof TransportError) {
+      return { ok: false, error: transportFailure(error) };
+    }
     const aborted = error instanceof Error && error.name === 'AbortError';
     return {
       ok: false,
@@ -190,4 +152,98 @@ export async function extractConversationFromImage(
     clearTimeout(timer);
     options.signal?.removeEventListener('abort', onExternalAbort);
   }
+}
+
+
+/* ── Transport ───────────────────────────────────────────────────────────── */
+
+/**
+ * Sends the image to whichever server relay this build targets and resolves the model's raw
+ * text. Throws `TransportError` for every expected failure so both relays land in one place.
+ */
+async function requestExtractionText(
+  prompt: PromptPair,
+  image: ImagePayload,
+  signal: AbortSignal,
+): Promise<string> {
+  if (isPlatformRelay()) {
+    // The platform route takes a plain Messages API body, so the image goes as a content block
+    // rather than the dev relay's `images` array.
+    return callPlatformRelay({
+      system: prompt.system,
+      content: [
+        {
+          type: 'image',
+          source: { type: 'base64', media_type: image.mediaType, data: image.dataBase64 },
+        },
+        { type: 'text', text: prompt.user },
+      ],
+      maxTokens: EXTRACTION_MAX_TOKENS,
+      signal,
+    });
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(PROXY_ENDPOINT, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      signal,
+      body: JSON.stringify({
+        system: prompt.system,
+        user: prompt.user,
+        maxTokens: EXTRACTION_MAX_TOKENS,
+        images: [image],
+      }),
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw error;
+    throw new TransportError('network', 'dev relay unreachable');
+  }
+
+  if (!response.ok) {
+    const failure = (await response.json().catch(() => ({}))) as RelayFailure;
+    const code = typeof failure.error === 'string' ? failure.error : `http_${response.status}`;
+    if (response.status === 503 && code === 'no_key_configured') {
+      throw new TransportError('no_client_available', 'relay has no key configured');
+    }
+    const providerMessage =
+      typeof failure.providerMessage === 'string' ? ` — ${failure.providerMessage}` : '';
+    throw new TransportError('provider_error', `${response.status}:${code}${providerMessage}`);
+  }
+
+  const payload = (await response.json()) as RelaySuccess;
+  if (typeof payload.text !== 'string' || payload.text.trim().length === 0) {
+    throw new TransportError('provider_error', 'relay returned no text');
+  }
+  return payload.text;
+}
+
+/**
+ * Screenshot-specific copy for a transport failure. Deliberately does NOT reuse the relay's own
+ * `userMessage`: the fallback that matters here is "paste the conversation as text", not the
+ * prepared examples, which cannot stand in for someone's own screenshot.
+ */
+function transportFailure(error: TransportError): ContextSwitchError {
+  if (error.kind === 'no_client_available') {
+    return aiError('no_client_available', {
+      userMessage: isPlatformRelay()
+        ? 'Reading a screenshot needs live AI, which is not switched on for this app yet. An owner can add a Claude API key under Manage. You can paste the conversation as text instead.'
+        : 'Reading a screenshot needs a live AI connection, which is not configured right now. You can paste the conversation as text instead.',
+      detail: error.detail,
+    });
+  }
+  if (error.kind === 'network') {
+    return aiError('network', {
+      userMessage:
+        'Could not reach the AI service to read the screenshot. You can paste the conversation as text instead.',
+      detail: error.detail,
+    });
+  }
+  return aiError('provider_error', {
+    userMessage:
+      error.userMessage ??
+      'The screenshot could not be read. You can try again, or paste the conversation as text instead.',
+    detail: error.detail,
+  });
 }

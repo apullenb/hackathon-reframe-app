@@ -5,6 +5,8 @@
  * places in the entire codebase that touch a key are:
  *   1. vite-plugin-ai-proxy.ts  (Node process only, never serialized to the client)
  *   2. src/ai/DirectAiClient.ts (bring-your-own-key, memory + sessionStorage only)
+ * A third live path, src/ai/platform.ts, carries no key at all: the Vibeland host holds one
+ * server-side and attaches it to the request, so there is nothing for the browser to store.
  */
 
 import type {
@@ -105,6 +107,28 @@ export function aiError(
     fixtureAvailable: options.fixtureAvailable ?? false,
     detail: options.detail,
   };
+}
+
+/* ── Transport failures ──────────────────────────────────────────────────── */
+
+/**
+ * Non-schema failures a transport can report. Kept as a typed throw so every client — dev
+ * relay, platform relay, bring-your-own-key — maps onto the same `ContextSwitchError` kinds.
+ *
+ * `userMessage` is optional and overrides the default copy for the kind. It exists for the
+ * failures where the generic sentence would leave the reader with nothing to do: a platform
+ * relay with no key configured needs to name the fix, because only the app's owner can apply
+ * it. Like `detail`, it must never carry message content, a key, or raw model output.
+ */
+export class TransportError extends Error {
+  constructor(
+    readonly kind: 'network' | 'provider_error' | 'no_client_available',
+    readonly detail: string,
+    readonly userMessage?: string,
+  ) {
+    super(kind);
+    this.name = 'TransportError';
+  }
 }
 
 /* ── Request helpers ─────────────────────────────────────────────────────── */

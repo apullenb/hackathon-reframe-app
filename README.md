@@ -4,7 +4,7 @@
 
 **Troubleshoot communication and debug relationships.**
 
-[**→ Try it live**](https://apullenb.github.io/hackathon-reframe-app/)
+[**→ Open it on Realms**](https://realms.240.org/reframe/) · *240 employees, behind SSO*
 
 </div>
 
@@ -113,23 +113,27 @@ implying the feeling is a distortion.
 
 ## Trying it live
 
-**[apullenb.github.io/hackathon-reframe-app](https://apullenb.github.io/hackathon-reframe-app/)**
+**[realms.240.org/reframe](https://realms.240.org/reframe/)** — internal to 240, behind Google SSO.
 
-Read this bit before you judge it, because the hosted version is deliberately limited:
+This is the full application, not a walkthrough: real Claude calls on whatever you type. The
+platform holds an Anthropic key server-side and exposes it to this app alone at a per-app route,
+so live AI works there the same way it does on a developer machine — and no key ever reaches the
+browser. There is no "paste your API key" box, because there is nothing for you to paste.
 
-Live AI runs through a **dev-server middleware plugin** that keeps the API key inside a Node
-process. GitHub Pages is static — there is no Node process — so on the live site that relay does
-not exist. What you get:
+Two things about that relay worth knowing:
 
-- **The three prepared scenarios work fully.** They are real, validated responses and the best way
-  to see what the product does in two minutes.
-- **Your own text is refused, not faked.** Rather than answering your paragraph with an unrelated
-  prepared response, the app says so plainly. That refusal is deliberate; handing back someone
-  else's message as though it were your translation is the difference between a demo and a fake.
-- **You can supply your own key** in **Settings** to run live on your own text. It goes from your
-  browser straight to the provider, and the UI says so.
+- **It is Claude-only.** The platform proxies Anthropic; there is no OpenAI equivalent. The
+  provider chain in this repo still falls back Claude → OpenAI when you run locally, where a Node
+  process legitimately holds both keys. On the hosted app a failure surfaces as a typed error with
+  a retry rather than a silent switch, because the alternative would mean shipping an OpenAI key
+  in browser JavaScript.
+- **An owner has to add the key once.** Until then every request returns 403 and the app says so
+  plainly instead of looking broken. Owners set it at
+  [Manage → Claude API key](https://realms.240.org/manage/?slug=reframe) — no redeploy, effective
+  on the next request.
 
-For live AI without pasting a key anywhere, run it locally.
+Rate limits are the platform's: 20 requests per minute per person, and `max_tokens` clamped to
+32,000. The app handles both cases with real messages.
 
 ## Run it locally
 
@@ -253,7 +257,8 @@ bounds, 44px minimum tap targets, and no status conveyed by colour alone.
 
 ## Known limitations
 
-1. **The hosted site cannot do live AI on your own text** without a user-supplied key — see above.
+1. **The hosted app is Claude-only** — the platform relay proxies Anthropic, so the local
+   Claude → OpenAI failover has no hosted equivalent.
 2. **Live output quality is under-verified.** The transport is proven end to end; the prompts have
    had far less adversarial testing than the code.
 3. **Multi-speaker conflicts are rejected, not supported.** More than two speakers is reported

@@ -119,7 +119,10 @@ function describe(activeSource: AiSource | null, configuredMode: AiMode, errored
         classes: 'border-primary/35 bg-primary-soft text-primary',
         dot: 'bg-primary',
         pulse: false,
-        title: 'This came from a built-in example response. No network request was made.',
+        // Deliberately not "no network request was made": a live relay may have been tried and
+        // declined first. What the badge is accountable for is where the words on screen came
+        // from, and no model produced them.
+        title: 'This came from a built-in example response. No AI generated it.',
       };
     default:
       return {

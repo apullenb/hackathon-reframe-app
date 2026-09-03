@@ -18,6 +18,7 @@ export {
   DEFAULT_TIMEOUT_MS,
   PROXY_ENDPOINT,
   PROXY_HEALTH_ENDPOINT,
+  TransportError,
   aiError,
   isAiMode,
   isContextSwitchMode,
@@ -31,6 +32,13 @@ export {
   findPreparedScenario,
   hasPreparedFixture,
 } from './FixtureAiClient';
+
+export {
+  PLATFORM_RELAY_MODEL,
+  isPlatformRelay,
+  platformRelayEndpoint,
+  platformSlug,
+} from './platform';
 
 export {
   ProxyAiClient,

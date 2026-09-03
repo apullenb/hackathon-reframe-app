@@ -1,9 +1,14 @@
 /**
- * Dev-proxy client — the live-AI path for a local demo.
+ * Server-relay client — the live-AI path whenever a server is holding the key for us.
+ *
+ * There are two such servers and this client speaks to whichever one the build targets:
+ *   - local dev: `/api/context-switch`, served by vite-plugin-ai-proxy.ts in the Vite process
+ *   - Vibeland:  `/api/_ai/<slug>/messages`, served by the platform (see ./platform.ts)
+ * They differ only in wire shape, so the choice lives in the transport and nothing above it —
+ * the router, the Zod gate, the retry rule and the `proxy` source label are shared.
  *
  * KEY HANDLING: this client holds NO key and never sees one. It POSTs already-rendered prompt
- * text to `/api/context-switch`, which is served by vite-plugin-ai-proxy.ts inside the Node
- * process. The key stays in that process.
+ * text and the server attaches the key on its side.
  *
  * This file also exports the shared model-output pipeline (`extractJsonObject`,
  * `runStructuredExchange`) that DirectAiClient reuses, so JSON extraction, the Zod gate, and
@@ -23,11 +28,16 @@ import {
   DEFAULT_TIMEOUT_MS,
   PROXY_ENDPOINT,
   PROXY_HEALTH_ENDPOINT,
+  TransportError,
   aiError,
   type AiResult,
   type AnalyzeOptions,
   type ContextSwitchAiClient,
 } from './types';
+import { PLATFORM_RELAY_MODEL, callPlatformRelay, isPlatformRelay } from './platform';
+
+// Re-exported so the other clients keep one import path for the shared transport failure type.
+export { TransportError } from './types';
 
 const HEALTH_TIMEOUT_MS = 1200;
 
@@ -92,20 +102,6 @@ export type SendResult = {
 };
 
 export type SendPrompt = (prompt: PromptPair, signal: AbortSignal) => Promise<SendResult>;
-
-/**
- * Non-schema failures a transport can report. Kept as a typed throw so the shared pipeline can
- * map transports onto the same `ContextSwitchError` kinds.
- */
-export class TransportError extends Error {
-  constructor(
-    readonly kind: 'network' | 'provider_error' | 'no_client_available',
-    readonly detail: string,
-  ) {
-    super(kind);
-    this.name = 'TransportError';
-  }
-}
 
 function parseCandidate(raw: string): unknown | null {
   const json = extractJsonObject(raw);
@@ -212,7 +208,15 @@ export async function runStructuredExchange(
     finish();
 
     if (error instanceof TransportError) {
-      return { ok: false, source, error: aiError(error.kind, { detail: error.detail }) };
+      return {
+        ok: false,
+        source,
+        error: aiError(error.kind, {
+          detail: error.detail,
+          // Present only where the default copy would leave the reader with nothing to do.
+          userMessage: error.userMessage,
+        }),
+      };
     }
     const aborted = error instanceof Error && error.name === 'AbortError';
     if (aborted) {
@@ -264,8 +268,25 @@ export interface ProxyHealthResult {
   mode: string | null;
 }
 
-/** GETs the dev-proxy health route. `keyConfigured` is a boolean; no key crosses this wire. */
+/**
+ * GETs the dev-proxy health route. `keyConfigured` is a boolean; no key crosses this wire.
+ *
+ * On the platform there is nothing to GET: the relay exposes no health route, and whether a key
+ * is configured is only knowable from a real request. So this reports the relay as usable and
+ * the 403 branch in ./platform.ts carries the "no key yet" case instead — which lands as
+ * `no_client_available`, the same kind an unkeyed dev proxy produces, so `auto` mode degrades to
+ * the prepared examples exactly as it does locally.
+ */
 export async function probeProxyHealth(): Promise<ProxyHealthResult> {
+  if (isPlatformRelay()) {
+    return {
+      reachable: true,
+      keyConfigured: true,
+      model: PLATFORM_RELAY_MODEL,
+      mode: 'live',
+    };
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
   try {
@@ -300,9 +321,24 @@ export class ProxyAiClient implements ContextSwitchAiClient {
   }
 
   async analyze(request: ContextSwitchRequest, options: AnalyzeOptions = {}): Promise<AiResult> {
-    return runStructuredExchange(request, 'proxy', sendViaProxy, options);
+    return runStructuredExchange(request, 'proxy', sendViaServerRelay, options);
   }
 }
+
+/** Whichever server relay this build targets. Everything above this line is shared. */
+const sendViaServerRelay: SendPrompt = (prompt, signal) =>
+  isPlatformRelay() ? sendViaPlatform(prompt, signal) : sendViaProxy(prompt, signal);
+
+const sendViaPlatform: SendPrompt = async (prompt, signal) => {
+  const text = await callPlatformRelay({
+    system: prompt.system,
+    content: prompt.user,
+    maxTokens: DEFAULT_MAX_TOKENS,
+    signal,
+  });
+  // The platform relay is Anthropic-only, so the provider is known without being reported.
+  return { text, provider: 'anthropic' };
+};
 
 const sendViaProxy: SendPrompt = async (prompt, signal) => {
   let response: Response;

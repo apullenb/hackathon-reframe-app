@@ -10,14 +10,16 @@
  *
  *   THE API KEY IS NEVER READ THIS WAY. Every VITE_-prefixed variable is inlined into the
  *   client bundle, so a key in one would be published with the app. The server key lives only
- *   in the Node process (vite-plugin-ai-proxy.ts) and the BYOK key lives only in
- *   DirectAiClient.ts's runtime store. Neither is an env var this file can see.
+ *   in the Node process (vite-plugin-ai-proxy.ts), or on the Vibeland platform when the build
+ *   targets it (platform.ts), and the BYOK key lives only in DirectAiClient.ts's runtime store.
+ *   None of them is an env var this file can see.
  */
 
 import type { AiMode, AiSource, ContextSwitchRequest } from '@/types/contracts';
 import { FixtureAiClient, hasPreparedFixture } from './FixtureAiClient';
 import { DirectAiClient, hasUserKey } from './DirectAiClient';
 import { ProxyAiClient, probeProxyHealth } from './ProxyAiClient';
+import { isPlatformRelay } from './platform';
 import {
   DEFAULT_AI_MODEL,
   aiError,
@@ -108,6 +110,21 @@ export function createAiRouter(config: AiRuntimeConfig): AiRouter {
     return inFlightProbe;
   }
 
+  /**
+   * Downgrades the cached probe after a relay proves it cannot serve. `needsUserKey` stays
+   * false on the platform: the key belongs to the app, not the visitor, and there is no key
+   * field there to point anyone at.
+   */
+  function markProxyUnavailable(): void {
+    if (!probed) return;
+    probed = {
+      ...probed,
+      proxyAvailable: false,
+      needsUserKey: !isPlatformRelay() && liveWanted() && !hasUserKey(),
+      preferredSource: preferredSource(false),
+    };
+  }
+
   /** A failure that means "this client cannot serve requests", so the cascade may continue. */
   function isUnavailable(result: AiResult): boolean {
     return (
@@ -140,11 +157,21 @@ export function createAiRouter(config: AiRuntimeConfig): AiRouter {
         activeSource = result.source;
         return result;
       }
-      lastFailure = result;
       // Only a truly unavailable proxy cascades; a timeout or a schema failure is reported as
       // itself rather than silently re-run on a second, slower path.
       if (!isUnavailable(result)) {
         return finishFailure(result, fixtureAvailable);
+      }
+      if (result.error.kind === 'no_client_available') {
+        // A relay that reports it holds no key was never configured — that is not a failure
+        // worth showing anyone. Locally the health probe catches this before a request is ever
+        // sent; the platform relay has no health route, so the first real request is where we
+        // find out. Latch it, and deliberately do NOT record it as `lastFailure`, so this and
+        // every later request behave exactly like the never-configured case: prepared
+        // scenarios simply run, and custom text gets the honest "not configured" refusal.
+        markProxyUnavailable();
+      } else {
+        lastFailure = result;
       }
     }
 
